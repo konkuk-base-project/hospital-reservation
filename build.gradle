@@ -23,15 +23,3 @@ jar {
         attributes 'Main-Class': 'Main'
     }
 }
-
-tasks.register('copyData', Copy) {
-    from('src/main/resources') {
-        include 'data/**'
-        include 'resource/**'
-    }
-    into layout.buildDirectory.dir('libs')
-}
-
-tasks.named('build') {
-    finalizedBy 'copyData'
-}
