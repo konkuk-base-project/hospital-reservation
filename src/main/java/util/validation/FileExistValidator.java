@@ -1,11 +1,9 @@
 package util.validation;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
+import util.file.FileUtil;
 
 public class FileExistValidator {
     private final List<String> requiredPaths = Arrays.asList(
@@ -19,9 +17,7 @@ public class FileExistValidator {
         System.out.print("필수 파일을 확인합니다...");
 
         for (String pathString : requiredPaths) {
-            Path path = Paths.get(pathString);
-
-            if (!Files.exists(path)) {
+            if (!FileUtil.resourceExists(pathString)) {
                 String formattedPath = "/" + pathString.replace("\\", "/");
                 System.out.println("[오류] '" + formattedPath + "'이(가) 존재하지 않습니다. 프로그램을 종료합니다.");
                 System.exit(0);
@@ -35,11 +31,8 @@ public class FileExistValidator {
     }
 
     private void validateDetailFiles(String listFilePath, String detailFileDir) {
-        Path listFile = Paths.get(listFilePath);
-        Path detailDir = Paths.get(detailFileDir);
-
         try {
-            List<String> lines = Files.readAllLines(listFile);
+            List<String> lines = FileUtil.readLines(listFilePath);
 
             for (int i = 1; i < lines.size(); i++) {
                 String line = lines.get(i).trim();
@@ -47,10 +40,10 @@ public class FileExistValidator {
                 String[] parts = line.split("\\s+");
                 if (parts.length > 0) {
                     String id = parts[0];
-                    Path detailFilePath = detailDir.resolve(id + ".txt");
+                    String detailFilePath = detailFileDir + "/" + id + ".txt";
 
-                    if (!Files.exists(detailFilePath)) {
-                        String formattedPath = "/" + detailFileDir.replace("\\", "/") + "/" + id + ".txt";
+                    if (!FileUtil.resourceExists(detailFilePath)) {
+                        String formattedPath = "/" + detailFilePath.replace("\\", "/");
                         System.out.println("\n[오류] '" + formattedPath + "'이(가) 존재하지 않습니다. 프로그램을 종료합니다.");
                         System.exit(0);
                     }
