@@ -55,4 +55,16 @@ public class FileUtil {
         Files.createDirectories(filePath.getParent());
         Files.write(filePath, lines);
     }
+
+    /**
+     * 리소스 디렉토리의 경로를 반환합니다
+     *
+     * @param relativePath resources 디렉토리 기준 상대 경로
+     * @return 리소스 파일의 절대 경로
+     */
+    public static Path getResourcePath(String relativePath) {
+        // resources 디렉토리를 기준으로 경로 생성 (한글 경로 문제 해결)
+        String userDir = System.getProperty("user.dir");
+        return Paths.get(userDir, "src", "main", "resources", relativePath);
+    }
 }
