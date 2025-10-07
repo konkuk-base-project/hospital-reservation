@@ -1,11 +1,17 @@
 package util.validation;
 
+import repository.AppointmentRepository;
+import util.exception.AppointmentFileException;
 import util.exception.FileFormatException;
 import util.file.FileUtil;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 public class FileFormatValidator {
 
@@ -27,6 +33,7 @@ public class FileFormatValidator {
             validateCredentialsFile();
             validatePatientDetailFiles();
             validateDoctorDetailFiles();
+            validateAppointmentFiles();
 
             System.out.println(" 성공");
         } catch (FileFormatException e) {
@@ -417,6 +424,52 @@ public class FileFormatValidator {
             }
         } catch (IOException e) {
             throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+        }
+    }
+
+    private void validateAppointmentFiles() {
+        try {
+            Path appointmentDir = FileUtil.getResourcePath("data/appointment");
+
+            if (!Files.exists(appointmentDir)) {
+                // 예약 디렉토리가 없으면 건너뜀 (선택적 기능)
+                return;
+            }
+
+            AppointmentRepository repository = new AppointmentRepository();
+
+            try (Stream<Path> files = Files.list(appointmentDir)) {
+                files.filter(path -> path.toString().endsWith(".txt"))
+                     .filter(path -> !path.getFileName().toString().contains("backup"))
+                     .forEach(path -> {
+                         String fileName = path.getFileName().toString();
+                         // YYYYMMDD.txt 형식 파일만 검증
+                         if (fileName.matches("\\d{8}\\.txt")) {
+                             try {
+                                 // 파일명에서 날짜 추출
+                                 String dateStr = fileName.replace(".txt", "");
+                                 int year = Integer.parseInt(dateStr.substring(0, 4));
+                                 int month = Integer.parseInt(dateStr.substring(4, 6));
+                                 int day = Integer.parseInt(dateStr.substring(6, 8));
+                                 LocalDate date = LocalDate.of(year, month, day);
+
+                                 // AppointmentRepository를 통해 검증
+                                 repository.getAppointmentsByDate(date);
+
+                             } catch (AppointmentFileException e) {
+                                 String filePath = "data/appointment/" + fileName;
+                                 String errorMsg = String.format("[오류] '/%s'의 형식이 올바르지 않습니다. %s 프로그램을 종료합니다.",
+                                     filePath, e.getMessage());
+                                 throw new FileFormatException(errorMsg);
+                             } catch (Exception e) {
+                                 String filePath = "data/appointment/" + fileName;
+                                 throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                             }
+                         }
+                     });
+            }
+        } catch (IOException e) {
+            throw new FileFormatException("[오류] 예약 파일 검증 중 오류가 발생했습니다. 프로그램을 종료합니다.");
         }
     }
 }
