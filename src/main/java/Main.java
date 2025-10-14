@@ -23,7 +23,7 @@ public class Main {
 
         Scanner scanner = new Scanner(System.in);
         while (true) {
-            System.out.print("Main > ");
+            System.out.print(commandHandler.getPrompt() + " > ");
             String input = scanner.nextLine();
 
             boolean isExit = commandHandler.handle(input);
