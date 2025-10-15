@@ -10,6 +10,10 @@ import service.auth.AuthService;
 import service.auth.LoginCommand;
 import service.auth.LogoutCommand;
 import service.auth.SignupCommand;
+import service.search.DeptCommand;
+import service.search.DoctorCommand;
+import service.search.MyListCommand;
+import service.search.SearchService;
 
 public class CommandHandler {
     private final AuthContext authContext;
@@ -21,11 +25,20 @@ public class CommandHandler {
         AuthRepository authRepository = new AuthRepository();
         AuthService authService = new AuthService(patientRepository, authRepository, authContext);
 
+        SearchService searchService = new SearchService(authContext);
+
         this.commands = new HashMap<>();
         commands.put("signup", new SignupCommand(authService));
         commands.put("login", new LoginCommand(authService));
         commands.put("logout", new LogoutCommand(authService));
+
+        // 검색 및 조회
+        commands.put("mylist", new MyListCommand(searchService));
+        commands.put("dept", new DeptCommand(searchService));
+        commands.put("doctor", new DoctorCommand(searchService));
+
         // 새로운 명령어 추가 시 여기 등록
+
     }
 
     public String getPrompt() {

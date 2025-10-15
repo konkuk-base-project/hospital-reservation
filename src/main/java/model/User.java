@@ -13,6 +13,10 @@ public class User {
         this.id = id;
     }
 
+    public String getId() {
+        return id;
+    }
+
     public String getUsername() { return username; }
     public String getHashedPassword() { return hashedPassword; }
     public String getRole() { return role; }
