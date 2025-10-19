@@ -1,5 +1,10 @@
 plugins {
     id 'java'
+    id 'application'
+}
+
+application {
+    mainClass = 'Main'
 }
 
 version = '1.0-SNAPSHOT'
@@ -22,4 +27,14 @@ jar {
     manifest {
         attributes 'Main-Class': 'Main'
     }
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+tasks.named('run') {
+    standardInput = System.in
 }
