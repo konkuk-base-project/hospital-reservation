@@ -5,9 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="306fd9c2-0293-4024-80c4-3b4bd3442cb1" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/data/patient/patientlist.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/auth/credentials.txt" beforeDir="false" afterPath="$PROJECT_DIR$/data/auth/credentials.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/patient/patientlist.txt" beforeDir="false" afterPath="$PROJECT_DIR$/data/patient/patientlist.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
