@@ -3,6 +3,7 @@ import java.util.Scanner;
 import service.CommandHandler;
 import util.validation.FileExistValidator;
 import util.validation.FileFormatValidator;
+import util.validation.OrphanDataValidator;
 
 public class Main {
 
@@ -14,6 +15,9 @@ public class Main {
 
         FileFormatValidator fileFormatValidator = new FileFormatValidator();
         fileFormatValidator.validate();
+
+        OrphanDataValidator orphanDataValidator = new OrphanDataValidator();
+        orphanDataValidator.validate();
 
         CommandHandler commandHandler = new CommandHandler();
 
