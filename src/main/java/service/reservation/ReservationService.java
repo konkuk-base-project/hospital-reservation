@@ -156,8 +156,11 @@ public class ReservationService {
             System.out.println("의사: " + doctorName);
             System.out.println("상태: " + statusText);
 
-        } catch (IOException e) {
-            throw new ReservationException("예약 조회 중 오류가 발생했습니다.");
+        } catch (ReservationException e) {
+            // ReservationException은 그대로 다시 던지기
+            throw e;
+        } catch (Exception e) {
+            throw new ReservationException("예약 생성 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
 
@@ -250,6 +253,9 @@ public class ReservationService {
 
             System.out.println("예약이 변경되었습니다. [예약번호: " + reservationId + "]");
 
+        } catch (ReservationException e) {
+            // ReservationException은 그대로 다시 던지기
+            throw e;
         } catch (Exception e) {
             throw new ReservationException("예약 수정 중 오류가 발생했습니다: " + e.getMessage());
         }
@@ -325,6 +331,9 @@ public class ReservationService {
 
             System.out.println("예약이 취소되었습니다. [예약번호: " + reservationId + "]");
 
+        } catch (ReservationException e) {
+            // ReservationException은 그대로 다시 던지기
+            throw e;
         } catch (Exception e) {
             throw new ReservationException("예약 취소 중 오류가 발생했습니다: " + e.getMessage());
         }
@@ -416,9 +425,56 @@ public class ReservationService {
             if (!availableSlots.contains(timeStr)) {
                 throw new ReservationException("이미 예약된 시간대입니다.");
             }
+        } catch (util.exception.AppointmentFileException e) {
+            // 예약 파일이 없는 경우 - 의사 스케줄에서 확인
+            if (e.getErrorType() == util.exception.AppointmentFileException.ErrorType.FILE_NOT_FOUND) {
+                try {
+                    if (!checkDoctorSchedule(doctorId, date, timeStr)) {
+                        throw new ReservationException("해당 시간은 예약할 수 없습니다.");
+                    }
+                } catch (IOException ioException) {
+                    throw new ReservationException("의사 스케줄을 확인하는 중 오류가 발생했습니다.");
+                }
+            } else {
+                throw new ReservationException("예약 가능 시간을 확인하는 중 오류가 발생했습니다: " + e.getMessage());
+            }
+        } catch (ReservationException e) {
+            // ReservationException은 그대로 다시 던지기 (메시지 중복 방지)
+            throw e;
         } catch (Exception e) {
-            throw new ReservationException("예약 가능 시간을 확인하는 중 오류가 발생했습니다.");
+            // 그 외 예외만 감싸서 던지기
+            throw new ReservationException("예약 가능 시간을 확인하는 중 오류가 발생했습니다: " + e.getMessage());
         }
+    }
+
+    /**
+     * 의사 스케줄 파일에서 예약 가능 여부 확인
+     */
+    private boolean checkDoctorSchedule(String doctorId, LocalDate date, String timeStr) throws IOException {
+        String doctorFilePath = "data/doctor/" + doctorId + ".txt";
+        List<String> lines = FileUtil.readLines(doctorFilePath);
+
+        String dateStr = date.format(DATE_FORMATTER);
+        int slotIndex = getSlotIndex(timeStr);
+
+        // 의사 파일에서 해당 날짜 찾기
+        for (int i = 3; i < lines.size(); i++) {
+            String line = lines.get(i).trim();
+            if (line.isEmpty()) continue;
+
+            if (line.startsWith(dateStr)) {
+                String[] parts = line.split("\\s+");
+                // 슬롯 인덱스가 범위 내인지 확인 (날짜 + 54개 슬롯)
+                if (slotIndex + 1 < parts.length) {
+                    // "0"이면 예약 가능, 아니면 예약 불가
+                    return "0".equals(parts[slotIndex + 1]);
+                }
+            }
+        }
+
+        // 해당 날짜가 의사 파일에 없으면 예약 가능으로 판단
+        // (updateDoctorSchedule()에서 새 날짜 줄이 자동으로 생성됨)
+        return true;
     }
 
     private String[] getDoctorInfo(String doctorId) throws IOException {

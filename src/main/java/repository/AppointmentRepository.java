@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -102,7 +103,20 @@ public class AppointmentRepository {
      */
     public void createAppointment(LocalDate date, String doctorId, String time, String reservationId)
             throws AppointmentFileException {
-        AppointmentData data = getAppointmentsByDate(date);
+
+        AppointmentData data;
+
+        try {
+            // 기존 파일이 있으면 읽기
+            data = getAppointmentsByDate(date);
+        } catch (AppointmentFileException e) {
+            // 파일이 없으면 새로 생성
+            if (e.getErrorType() == AppointmentFileException.ErrorType.FILE_NOT_FOUND) {
+                data = createNewAppointmentFile(date, doctorId);
+            } else {
+                throw e;
+            }
+        }
 
         int doctorIndex = findDoctorIndex(data.doctorIds, doctorId);
         int timeSlotIndex = findTimeSlotIndex(data.timeSlots, time);
@@ -111,8 +125,8 @@ public class AppointmentRepository {
         String currentStatus = data.timeSlots.get(timeSlotIndex).statuses[doctorIndex];
         if (!"0".equals(currentStatus)) {
             throw new AppointmentFileException(
-                AppointmentFileException.ErrorType.INVALID_APPOINTMENT_STATUS,
-                String.format("해당 시간대는 예약할 수 없습니다. 현재 상태: %s", currentStatus)
+                    AppointmentFileException.ErrorType.INVALID_APPOINTMENT_STATUS,
+                    String.format("해당 시간대는 예약할 수 없습니다. 현재 상태: %s", currentStatus)
             );
         }
 
@@ -121,6 +135,63 @@ public class AppointmentRepository {
 
         // 파일에 저장
         saveAppointmentData(date, data);
+    }
+
+    /**
+     * 새로운 예약 파일 데이터 생성
+     */
+    private AppointmentData createNewAppointmentFile(LocalDate date, String doctorId) throws AppointmentFileException {
+        try {
+            // doctorlist.txt에서 모든 의사 목록 가져오기
+            List<String> doctorLines = FileUtil.readLines("data/doctor/doctorlist.txt");
+            List<String> doctorIds = new ArrayList<>();
+
+            for (int i = 1; i < doctorLines.size(); i++) {
+                String line = doctorLines.get(i).trim();
+                if (line.isEmpty()) continue;
+
+                String[] parts = line.split("\\s+");
+                if (parts.length >= 1) {
+                    doctorIds.add(parts[0]);
+                }
+            }
+
+            if (doctorIds.isEmpty()) {
+                throw new AppointmentFileException(
+                        AppointmentFileException.ErrorType.INVALID_DOCTOR_LIST,
+                        "의사 목록을 찾을 수 없습니다"
+                );
+            }
+
+            String[] doctorArray = doctorIds.toArray(new String[0]);
+
+            // 모든 시간 슬롯 생성 (09:00 ~ 17:50)
+            List<TimeSlot> timeSlots = new ArrayList<>();
+            LocalTime currentTime = LocalTime.of(9, 0);
+            LocalTime endTime = LocalTime.of(17, 50);
+
+            while (!currentTime.isAfter(endTime)) {
+                String timeStr = currentTime.format(DateTimeFormatter.ofPattern("HH:mm"));
+                String[] statuses = new String[doctorArray.length];
+
+                // 모든 의사에 대해 초기 상태를 "0" (예약 가능)으로 설정
+                for (int i = 0; i < doctorArray.length; i++) {
+                    statuses[i] = "0";
+                }
+
+                timeSlots.add(new TimeSlot(timeStr, statuses));
+                currentTime = currentTime.plusMinutes(10);
+            }
+
+            return new AppointmentData(date, doctorArray, timeSlots);
+
+        } catch (IOException e) {
+            throw new AppointmentFileException(
+                    AppointmentFileException.ErrorType.FILE_READ_ERROR,
+                    "의사 목록 파일을 읽는 중 오류가 발생했습니다",
+                    e
+            );
+        }
     }
 
     /**
