@@ -9,7 +9,7 @@ public class FileExistValidator {
     private final List<String> requiredPaths = Arrays.asList(
             "data/patient/patientlist.txt",
             "data/doctor/doctorlist.txt",
-            "resource/virtualtime.txt",
+            "data/time/virtualtime.txt",
             "data/auth/credentials.txt"
     );
 

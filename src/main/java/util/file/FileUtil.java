@@ -1,52 +1,31 @@
 package util.file;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class FileUtil {
 
     public static List<String> readLines(String filePath) throws IOException {
-        InputStream is = FileUtil.class.getClassLoader().getResourceAsStream(filePath);
+        Path resourcePath = getResourcePath(filePath);
 
-        if (is == null) {
-            Path path = Paths.get(filePath);
-            if (!Files.exists(path)) {
-                return Collections.emptyList();
-            }
-            return Files.readAllLines(path);
+        if (!Files.exists(resourcePath)) {
+            return Collections.emptyList();
         }
 
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-            return reader.lines().collect(Collectors.toList());
-        }
+        return Files.readAllLines(resourcePath);
     }
 
     public static boolean resourceExists(String filePath) {
-        InputStream is = FileUtil.class.getClassLoader().getResourceAsStream(filePath);
-        if (is != null) {
-            try {
-                is.close();
-            } catch (IOException e) {
-                // ignore
-            }
-            return true;
-        }
-        return Files.exists(Paths.get(filePath));
+        return Files.exists(getResourcePath(filePath));
     }
 
     public static void appendLine(String filePath, String line) throws IOException {
-        Path path = Paths.get(filePath);
+        Path path = getResourcePath(filePath);
         Files.createDirectories(path.getParent());
         Files.writeString(path, System.lineSeparator() + line, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
     }
@@ -57,14 +36,14 @@ public class FileUtil {
     }
 
     /**
-     * 리소스 디렉토리의 경로를 반환합니다
+     * 프로젝트 루트 기준 경로를 반환합니다
      *
-     * @param relativePath resources 디렉토리 기준 상대 경로
-     * @return 리소스 파일의 절대 경로
+     * @param relativePath 프로젝트 루트 기준 상대 경로
+     * @return 파일의 절대 경로
      */
     public static Path getResourcePath(String relativePath) {
-        // resources 디렉토리를 기준으로 경로 생성 (한글 경로 문제 해결)
+        // 프로젝트 루트를 기준으로 경로 생성 (한글 경로 문제 해결)
         String userDir = System.getProperty("user.dir");
-        return Paths.get(userDir, "src", "main", "resources", relativePath);
+        return Paths.get(userDir, relativePath);
     }
 }
