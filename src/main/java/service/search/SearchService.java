@@ -112,34 +112,24 @@ public class SearchService {
         }
 
         if (args.length == 0) {
-            throw new SearchException("인자가 부족합니다. (형식: doctor <의사번호> <날짜 YYYY-MM-DD>)");
+            throw new SearchException("인자가 부족합니다. (형식: doctor <의사번호>)");
         }
 
-        String doctorIdOrName = args[0];
-        String doctorId = null;
-
-        // 의사번호 형식인지 확인
-        if (doctorIdOrName.matches("D\\d{5}")) {
-            doctorId = doctorIdOrName;
-            // 의사 존재 여부 확인
-            if (!isDoctorExists(doctorId)) {
-                throw new SearchException("의사번호가 존재하지 않습니다.");
-            }
-        } else {
-            // 의사 이름으로 검색
-            doctorId = findDoctorIdByName(doctorIdOrName);
-            if (doctorId == null) {
-                throw new SearchException("의사를 찾을 수 없습니다.");
-            }
+        if (args.length > 1) {
+            throw new SearchException("인자가 잘못된 형식입니다.");
         }
 
-        if (args.length != 2) {
-            throw new SearchException("인자가 부족합니다. (형식: doctor <의사번호> <날짜 YYYY-MM-DD>)");
+        String doctorId = args[0];
+
+        if (!doctorId.matches("D\\d{5}")) {
+            throw new SearchException("인자가 잘못된 형식입니다.");
         }
 
-        LocalDate date = parseAndValidateDate(args[1]);
+        if (!isDoctorExists(doctorId)) {
+            throw new SearchException("의사번호가 존재하지 않습니다.");
+        }
 
-        showDoctorAvailableSlots(doctorId, date);
+        showDoctorAvailableSlots(doctorId, null);
     }
 
     /**
@@ -208,7 +198,7 @@ public class SearchService {
             String doctorName = getDoctorName(doctorId);
 
             System.out.println("======================================================================================");
-            System.out.println(doctorName + "(" + doctorId + ") 예약 가능 일정 (" + date + ")");
+            System.out.println(doctorName + " 예약 가능 일정 ");
             System.out.println("======================================================================================");
 
             List<String> availableSlots = getAvailableSlots(doctorId, date);
