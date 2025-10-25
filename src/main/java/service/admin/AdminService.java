@@ -242,7 +242,7 @@ public class AdminService {
         }
 
         try (DirectoryStream<Path> ds =
-                     Files.newDirectoryStream(Paths.get("data/patient"), "P*.txt")) {
+                     Files.newDirectoryStream(FileUtil.getResourcePath("data/patient"), "P*.txt")) {
             for (Path p : ds) {
                 String pno = p.getFileName().toString().replace(".txt", "");
                 try (BufferedReader br = Files.newBufferedReader(p)) {

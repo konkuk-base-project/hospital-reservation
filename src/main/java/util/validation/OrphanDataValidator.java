@@ -29,6 +29,7 @@ public class OrphanDataValidator {
         } catch (Exception e) {
             System.out.println();
             System.out.println("[오류] 고아 데이터 검사 중 예기치 못한 오류가 발생하였습니다. 프로그램을 종료합니다.");
+            e.printStackTrace(); 
             System.exit(0);
         }
     }

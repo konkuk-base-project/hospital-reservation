@@ -133,7 +133,7 @@ public class FileFormatValidator {
     }
 
     private void validateVirtualTimeFile() {
-        String filePath = "resource/virtualtime.txt";
+        String filePath = "data/time/virtualtime.txt";
         try {
             List<String> lines = FileUtil.readLines(filePath);
 
