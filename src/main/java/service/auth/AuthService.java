@@ -74,7 +74,6 @@ public class AuthService {
         } catch (IOException ignored) {}
 
         // 로그인 메시지 출력
-        System.out.println("관리자(Admin)로 로그인되었습니다.");
         System.out.flush();
 
     return;
