@@ -15,15 +15,15 @@ import service.auth.LoginCommand;
 import service.auth.LogoutCommand;
 import service.auth.SignupCommand;
 import service.common.HelpCommand;
+import service.reservation.CancelCommand;
+import service.reservation.CheckCommand;
+import service.reservation.ModifyCommand;
+import service.reservation.ReservationService;
+import service.reservation.ReserveCommand;
 import service.search.DeptCommand;
 import service.search.DoctorCommand;
 import service.search.MyListCommand;
 import service.search.SearchService;
-import service.reservation.ReservationService;
-import service.reservation.ReserveCommand;
-import service.reservation.CheckCommand;
-import service.reservation.ModifyCommand;
-import service.reservation.CancelCommand;
 
 
 public class CommandHandler {
@@ -101,6 +101,14 @@ public class CommandHandler {
         if (commandName.equals("help") && command instanceof service.common.HelpCommand helpCmd) {
         helpCmd.updateContext(authContext.getPrompt());
         }
+
+        /* 관리자 전용 명령어 차단 로직 추가 */
+        if (authContext.getPrompt().equals("User") &&
+        (commandName.equals("user") || commandName.equals("reserve-list"))) {
+        System.out.println("[오류] 알 수 없는 명령어입니다. 'help'를 입력하여 도움말을 확인하세요.");
+        return false;
+        }
+
 
         if (command != null) {
             command.execute(args);
