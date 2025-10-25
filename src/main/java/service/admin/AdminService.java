@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -26,9 +25,9 @@ public class AdminService {
     // ========== 6.4.1 회원 검색 ==========
     public void searchUser(String[] args) throws SearchException {
         if (args.length < 1) {
-            throw new SearchException("형식: user <아이디> resv");
+            throw new SearchException("인자가 부족합니다. (형식: user <아이디> resv)");
         }
-        if (args.length >= 2 && !args[1].equalsIgnoreCase("resv")) {
+        if (args.length >= 2 && !args[1].equals("resv")) {
             throw new SearchException("알 수 없는 인자입니다. (사용 가능한 옵션: resv)");
         }
 
@@ -112,7 +111,7 @@ public class AdminService {
     // ========== 6.4.2 예약 현황 ==========
     public void showReserveList(String[] args) throws SearchException {
         if (args.length != 1) {
-            throw new SearchException("형식: reserve-list <YYYY-MM-DD>");
+            throw new SearchException("인자가 부족합니다. (형식: reserve-list YYYY-MM-DD)");
         }
         String date = args[0];
         if (!date.matches("\\d{4}-\\d{2}-\\d{2}")) {
