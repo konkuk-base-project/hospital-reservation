@@ -4,14 +4,15 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.regex.Pattern;
+
 import model.Patient;
 import model.User;
 import repository.AuthRepository;
 import repository.PatientRepository;
 import service.AuthContext;
-import util.hash.PasswordHasher;
 import util.exception.LoginException;
 import util.exception.SignupException;
+import util.hash.PasswordHasher;
 
 public class AuthService {
     private final PatientRepository patientRepository;
@@ -62,6 +63,25 @@ public class AuthService {
         String username = args[0];
         String password = args[1];
 
+        // 관리자 로그인 처리 (login 000 000)
+        if (username.equals("000") && password.equals("000")) {
+        User admin = new User("000", PasswordHasher.hash("000"), "ADMIN", "A000000");
+        authContext.login(admin);
+
+        // 콘솔 잔여 문자 강제 제거 (Gradle run 입력 버퍼 대응)
+        try {
+            System.in.skip(System.in.available()); 
+        } catch (IOException ignored) {}
+
+        // 로그인 메시지 출력
+        System.out.println("관리자(Admin)로 로그인되었습니다.");
+        System.out.flush();
+
+    return;
+}
+
+
+
         User user = authRepository.findByUsername(username)
                 .orElseThrow(() -> new LoginException("존재하지 않는 아이디입니다."));
 
@@ -70,6 +90,9 @@ public class AuthService {
             throw new LoginException("비밀번호가 일치하지 않습니다.");
         }
         authContext.login(user);
+
+        
+
     }
 
     public void logout(String[] args) throws LoginException {
