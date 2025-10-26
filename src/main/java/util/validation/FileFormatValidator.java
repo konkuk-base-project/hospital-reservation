@@ -245,8 +245,7 @@ public class FileFormatValidator {
                     String detailFilePath = "data/patient/" + patientId + ".txt";
 
                     if (!FileUtil.resourceExists(detailFilePath)) {
-                        String formattedPath = "/" + detailFilePath.replace("\\", "/");
-                        throw new FileFormatException("[오류] '" + formattedPath + "'이(가) 존재하지 않습니다. 프로그램을 종료합니다.");
+                        throw new FileFormatException("[오류] '/data/patient/patientlist.txt'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                     }
 
                     validatePatientDetailFile(patientId);
@@ -351,8 +350,7 @@ public class FileFormatValidator {
                     String detailFilePath = "data/doctor/" + doctorId + ".txt";
 
                     if (!FileUtil.resourceExists(detailFilePath)) {
-                        String formattedPath = "/" + detailFilePath.replace("\\", "/");
-                        throw new FileFormatException("[오류] '" + formattedPath + "'이(가) 존재하지 않습니다. 프로그램을 종료합니다.");
+                        throw new FileFormatException("[오류] '/data/doctor/doctorlist.txt'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                     }
 
                     validateDoctorDetailFile(doctorId);
