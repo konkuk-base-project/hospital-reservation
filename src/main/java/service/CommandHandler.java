@@ -29,6 +29,7 @@ public class CommandHandler {
     private final AuthContext authContext;
     private final Map<String, Command> commands;
     private final HelpCommand helpCommand;
+    private final Scanner scanner = new Scanner(System.in);
 
     public CommandHandler() {
         this.authContext = new AuthContext();
@@ -69,11 +70,15 @@ public class CommandHandler {
 
     }
 
+    public String readCommand(Scanner scanner) {
+    return scanner.nextLine();
+}
+
     public String getPrompt() {
         return authContext.getPrompt();
     }
 
-    public boolean handle(String input) {
+    public boolean handle(String input, Scanner scanner) { 
         if (input.trim().isEmpty()) {
             return false;
         }
@@ -83,51 +88,44 @@ public class CommandHandler {
         String[] args = Arrays.copyOfRange(tokens, 1, tokens.length);
 
         if ("exit".equals(commandName)) {
+    if (tokens.length > 1) {
+        System.out.println("[오류] 불필요한 인자가 입력되었습니다. (형식: exit)");
+        return false;
+    }
 
-            // exit 뒤에 인자가 있을 경우 — 오류 메시지 출력
-            if (tokens.length > 1) {
-                System.out.println("[오류] 불필요한 인자가 입력되었습니다. (형식: exit)");
-                return false;
-            }
+    System.out.print("프로그램을 종료하시겠습니까? (Y/N): ");
+    String confirm = scanner.nextLine().trim(); 
 
-            System.out.print("프로그램을 종료하시겠습니까? (Y/N): ");
-            Scanner scanner = new Scanner(System.in);
-            String confirm = scanner.nextLine();
-            // Y/y 입력
-            if (confirm.equalsIgnoreCase("Y")) {
-                System.out.println("프로그램을 종료합니다. 감사합니다.");
-                System.out.println("[프로그램 종료]");
-                return true; 
-            }
+    if (confirm.equalsIgnoreCase("Y")) {
+        System.out.println("프로그램을 종료합니다. 감사합니다.");
+        System.out.println("[프로그램 종료]");
+        return true;
+    }
 
-            // N/n 입력
-            if (confirm.equalsIgnoreCase("N")) {
-                System.out.println("종료가 취소되었습니다.");
-                return false; 
-            }
+    System.out.println("종료가 취소되었습니다.");
+    return false;
+}
 
-            // 별다른 메시지 없이 Main 프롬프트로 복귀
-            return false;
-        }
 
-        Command command = commands.get(commandName);
-
-        if (commandName.equals("help") && command instanceof service.common.HelpCommand helpCmd) {
+        if (commandName.equals("help") && commands.get("help") instanceof HelpCommand helpCmd) {
             helpCmd.updateContext(authContext.getPrompt());
         }
 
-        /* 관리자 전용 명령어 차단 로직 추가 */
+        // 관리자 전용 명령어 접근 차단
         if (authContext.getPrompt().equals("User") &&
                 (commandName.equals("user") || commandName.equals("reserve-list"))) {
             System.out.println("[오류] 알 수 없는 명령어입니다. 'help'를 입력하여 도움말을 확인하세요.");
             return false;
         }
 
+        // 기본 명령 처리
+        Command command = commands.get(commandName);
         if (command != null) {
-            command.execute(args);
+            command.execute(Arrays.copyOfRange(tokens, 1, tokens.length));
         } else {
             System.out.println("[오류] 알 수 없는 명령어입니다. 'help'를 입력하여 도움말을 확인하세요.");
         }
+
         return false;
     }
 }
