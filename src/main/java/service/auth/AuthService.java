@@ -26,7 +26,7 @@ public class AuthService {
     }
 
     public String signup(String[] args) throws SignupException {
-        if (args.length != 6) throw new SignupException("인자가 부족합니다. (형식: signup <아이디> <비밀번호> <비밀번호확인> <이름> <생년월일> <전화번호>)");
+        if (args.length != 6) throw new SignupException("인자의 개수가 올바르지 않습니다. (형식: signup <아이디> <비밀번호> <비밀번호확인> <이름> <생년월일> <전화번호>)");
 
         String username = args[0];
         String password = args[1];
@@ -50,7 +50,7 @@ public class AuthService {
             User newUser = new User(username, hashedPassword, "USER", newPatientId);
             authRepository.save(newUser);
 
-            return "회원가입이 완료되었습니다. [환자번호: " + newPatientId + "] 로그인 화면으로 이동합니다.";
+            return "회원가입이 완료되었습니다. [환자번호: " + newPatientId + "]";
         } catch (IOException e) {
             throw new SignupException("회원 정보를 파일에 저장하는 중 오류가 발생했습니다: " + e.getMessage());
         }
@@ -58,7 +58,7 @@ public class AuthService {
 
     public void login(String[] args) throws LoginException {
         if (authContext.isLoggedIn()) throw new LoginException("이미 로그인되어 있습니다.");
-        if (args.length != 2) throw new LoginException("인자가 부족합니다. (형식: login <아이디> <비밀번호>)");
+        if (args.length != 2) throw new LoginException("인자의 개수가 올바르지 않습니다. (형식: login <아이디> <비밀번호>)");
 
         String username = args[0];
         String password = args[1];
@@ -112,7 +112,7 @@ public class AuthService {
     }
 
     private void validateName(String name) throws SignupException {
-        if (name.length() < 2 || name.length() > 20) throw new SignupException("이름은 길이가 2 이상 20 이하입니다.");
+        if (name.length() < 2 || name.length() > 20) throw new SignupException("이름은 최소 2자 이상 입력해야 합니다.");
         if (!Pattern.matches("^[a-zA-Z가-힣]+$", name)) throw new SignupException("이름은 한글(완성형) 또는 로마자(a-z, A-Z)로만 구성되며 공백은 허용되지 않습니다.");
     }
 
@@ -120,7 +120,7 @@ public class AuthService {
         try {
             LocalDate birthDate = LocalDate.parse(birthDateStr);
             if (birthDate.isBefore(LocalDate.of(1900, 1, 1)) || birthDate.isAfter(LocalDate.now())) {
-                throw new SignupException("생년월일이 유효하지 않습니다. (1900-01-01부터 현재 날짜까지만 유효)");
+                throw new SignupException("생년월일이 유효하지 않습니다. (1900-01-01부터 유효)");
             }
         } catch (DateTimeParseException e) {
             throw new SignupException("생년월일 형식이 잘못되었습니다. (예: YYYY-MM-DD)");

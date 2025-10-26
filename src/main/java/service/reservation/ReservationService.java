@@ -43,7 +43,7 @@ public class ReservationService {
         }
 
         if (args.length != 3) {
-            throw new ReservationException("인자가 부족합니다. (형식: reserve <의사번호|의사이름> <날짜 YYYY-MM-DD> <시간 HH:MM>)");
+            throw new ReservationException("인자의 개수가 올바르지 않습니다 (형식: reserve <의사번호|의사이름> <날짜 YYYY-MM-DD> <시간 HH:MM>)");
         }
 
         String doctorIdOrName = args[0];
@@ -99,7 +99,7 @@ public class ReservationService {
         }
 
         if (args.length != 1) {
-            throw new ReservationException("인자가 부족합니다. (형식: check <예약번호>)");
+            throw new ReservationException("인자의 개수가 올바르지 않습니다. (형식: check <예약번호>)");
         }
 
         String reservationId = args[0];
@@ -173,7 +173,7 @@ public class ReservationService {
         }
 
         if (args.length != 3) {
-            throw new ReservationException("인자가 부족합니다. (형식: modify <예약번호> <새날짜 YYYY-MM-DD> <새시간 HH:MM>)");
+            throw new ReservationException("인자의 개수가 올바르지 않습니다. (형식: modify <예약번호> <새날짜 YYYY-MM-DD> <새시간 HH:MM>)");
         }
 
         String reservationId = args[0];
@@ -270,7 +270,7 @@ public class ReservationService {
         }
 
         if (args.length != 1) {
-            throw new ReservationException("인자가 부족합니다. (형식: cancel <예약번호>)");
+            throw new ReservationException("인자의 개수가 올바르지 않습니다. (형식: cancel <예약번호>)");
         }
 
         String reservationId = args[0];
