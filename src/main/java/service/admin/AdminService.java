@@ -70,14 +70,16 @@ public class AdminService {
         System.out.println("연락처: " + phone);
 
         if (!withResv) {
-            System.out.println("======================================================================================");
+            System.out
+                    .println("======================================================================================");
             return;
         }
 
         String pfile = "data/patient/" + patientNo + ".txt";
         if (!FileUtil.resourceExists(pfile)) {
             System.out.println("예약 내역: (없음)");
-            System.out.println("======================================================================================");
+            System.out
+                    .println("======================================================================================");
             return;
         }
 
@@ -86,7 +88,8 @@ public class AdminService {
             List<String> lines = FileUtil.readLines(pfile);
             for (int i = 4; i <= lines.size(); i++) {
                 String l = lines.get(i - 1).trim();
-                if (l.isEmpty()) continue;
+                if (l.isEmpty())
+                    continue;
                 String[] a = l.split("\\s+");
                 if (a.length >= 7) {
                     String rno = a[0];
@@ -121,7 +124,8 @@ public class AdminService {
         String ymd = date.replace("-", "");
         String apFile = "data/appointment/" + ymd + ".txt";
         if (!FileUtil.resourceExists(apFile)) {
-            throw new SearchException("해당 날짜의 파일이 존재하지 않습니다. (" + apFile + ")");
+            System.out.println("(예약 없음).");
+            return;
         }
 
         try {
@@ -129,13 +133,14 @@ public class AdminService {
             if (lines.size() < 2) {
                 throw new SearchException("파일 형식이 올바르지 않습니다.");
             }
-            String header = lines.get(1).trim();         // TIME D00001 D00002 ...
+            String header = lines.get(1).trim(); // TIME D00001 D00002 ...
             String[] head = header.split("\\s+");
             if (head.length < 2 || !head[0].equals("TIME")) {
                 throw new SearchException("파일 형식이 올바르지 않습니다.");
             }
             List<String> doctorNos = new ArrayList<>();
-            for (int i = 1; i < head.length; i++) doctorNos.add(head[i]);
+            for (int i = 1; i < head.length; i++)
+                doctorNos.add(head[i]);
 
             Map<String, String> doctorNameMap = loadDoctorNames();
             Map<String, String> doctorDeptMap = loadDoctorDeptCodes();
@@ -143,14 +148,17 @@ public class AdminService {
             List<String> out = new ArrayList<>();
             for (int li = 2; li < lines.size(); li++) {
                 String row = lines.get(li).trim();
-                if (row.isEmpty()) continue;
+                if (row.isEmpty())
+                    continue;
                 String[] cols = row.split("\\s+");
-                if (cols.length != (1 + doctorNos.size())) continue;
+                if (cols.length != (1 + doctorNos.size()))
+                    continue;
 
                 String time = cols[0];
                 for (int i = 0; i < doctorNos.size(); i++) {
                     String cell = cols[i + 1];
-                    if (cell.equals("0") || cell.equalsIgnoreCase("X")) continue;
+                    if (cell.equals("0") || cell.equalsIgnoreCase("X"))
+                        continue;
 
                     String rno = cell;
                     String docNo = doctorNos.get(i);
@@ -165,11 +173,15 @@ public class AdminService {
                 }
             }
 
-            System.out.println("======================================================================================");
+            System.out
+                    .println("======================================================================================");
             System.out.printf("%s 예약 현황 (총 %d건)%n", date, out.size());
-            System.out.println("======================================================================================");
-            if (out.isEmpty()) System.out.println("(예약 없음)");
-            else out.forEach(System.out::println);
+            System.out
+                    .println("======================================================================================");
+            if (out.isEmpty())
+                System.out.println("(예약 없음)");
+            else
+                out.forEach(System.out::println);
 
         } catch (IOException e) {
             throw new SearchException("예약 현황 확인 중 오류가 발생했습니다.");
@@ -207,7 +219,10 @@ public class AdminService {
         String[] s = hhmm.split(":");
         int h = Integer.parseInt(s[0]);
         int m = Integer.parseInt(s[1]) + 10;
-        if (m >= 60) { h++; m -= 60; }
+        if (m >= 60) {
+            h++;
+            m -= 60;
+        }
         return String.format("%02d:%02d", h, m);
     }
 
@@ -216,7 +231,8 @@ public class AdminService {
         List<String> lines = FileUtil.readLines("data/doctor/doctorlist.txt");
         for (int i = 1; i < lines.size(); i++) {
             String[] a = lines.get(i).trim().split("\\s+");
-            if (a.length >= 3) map.put(a[0], a[1]); // D번호 -> 이름
+            if (a.length >= 3)
+                map.put(a[0], a[1]); // D번호 -> 이름
         }
         return map;
     }
@@ -226,7 +242,8 @@ public class AdminService {
         List<String> lines = FileUtil.readLines("data/doctor/doctorlist.txt");
         for (int i = 1; i < lines.size(); i++) {
             String[] a = lines.get(i).trim().split("\\s+");
-            if (a.length >= 3) map.put(a[0], a[2]); // D번호 -> 진료과코드
+            if (a.length >= 3)
+                map.put(a[0], a[2]); // D번호 -> 진료과코드
         }
         return map;
     }
@@ -237,11 +254,11 @@ public class AdminService {
         List<String> plist = FileUtil.readLines("data/patient/patientlist.txt");
         for (int i = 1; i < plist.size(); i++) {
             String[] a = plist.get(i).trim().split("\\s+");
-            if (a.length >= 2) pnoToId.put(a[0], a[1]); // P000001 -> hong123
+            if (a.length >= 2)
+                pnoToId.put(a[0], a[1]); // P000001 -> hong123
         }
 
-        try (DirectoryStream<Path> ds =
-                     Files.newDirectoryStream(FileUtil.getResourcePath("data/patient"), "P*.txt")) {
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(FileUtil.getResourcePath("data/patient"), "P*.txt")) {
             for (Path p : ds) {
                 String pno = p.getFileName().toString().replace(".txt", "");
                 try (BufferedReader br = Files.newBufferedReader(p)) {
@@ -249,9 +266,11 @@ public class AdminService {
                     int lineNo = 0;
                     while ((l = br.readLine()) != null) {
                         lineNo++;
-                        if (lineNo <= 3) continue;
+                        if (lineNo <= 3)
+                            continue;
                         l = l.trim();
-                        if (l.isEmpty()) continue;
+                        if (l.isEmpty())
+                            continue;
                         String[] a = l.split("\\s+");
                         if (a.length >= 1 && a[0].equals(rno)) {
                             return pnoToId.getOrDefault(pno, null);
