@@ -29,9 +29,9 @@ public class Main {
         Scanner scanner = new Scanner(System.in);
         while (true) {
             System.out.print(commandHandler.getPrompt() + " > ");
-            String input = scanner.nextLine();
+            String input = commandHandler.readCommand(scanner);
 
-            boolean isExit = commandHandler.handle(input);
+            boolean isExit = commandHandler.handle(input, scanner);
 
             if (isExit) {
                 break;
