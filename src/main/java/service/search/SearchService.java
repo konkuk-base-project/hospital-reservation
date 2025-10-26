@@ -82,8 +82,8 @@ public class SearchService {
             throw new SearchException("로그인이 필요합니다.");
         }
 
-        if (args.length == 0) {
-            throw new SearchException("인자가 부족합니다. (형식: dept <진료과 코드>)");
+        if (args.length == 0 || args.length > 2) {
+            throw new SearchException("인자의 개수가 올바르지 않습니다. (형식: dept <진료과 코드> 또는 dept <진료과 코드> <날짜>)");
         }
 
         String deptCode = args[0].toUpperCase();
@@ -111,12 +111,8 @@ public class SearchService {
             throw new SearchException("로그인이 필요합니다.");
         }
 
-        if (args.length == 0) {
-            throw new SearchException("인자가 부족합니다. (형식: doctor <의사번호>)");
-        }
-
-        if (args.length > 1) {
-            throw new SearchException("인자가 잘못된 형식입니다.");
+        if (args.length != 1) {
+            throw new SearchException("인자의 개수가 올바르지 않습니다. (형식: doctor <의사번호>)");
         }
 
         String doctorId = args[0];

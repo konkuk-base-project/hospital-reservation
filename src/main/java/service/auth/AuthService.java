@@ -26,7 +26,7 @@ public class AuthService {
     }
 
     public String signup(String[] args) throws SignupException {
-        if (args.length != 6) throw new SignupException("인자가 부족합니다. (형식: signup <아이디> <비밀번호> <비밀번호확인> <이름> <생년월일> <전화번호>)");
+        if (args.length != 6) throw new SignupException("인자의 개수가 올바르지 않습니다. (형식: signup <아이디> <비밀번호> <비밀번호확인> <이름> <생년월일> <전화번호>)");
 
         String username = args[0];
         String password = args[1];
@@ -58,7 +58,7 @@ public class AuthService {
 
     public void login(String[] args) throws LoginException {
         if (authContext.isLoggedIn()) throw new LoginException("이미 로그인되어 있습니다.");
-        if (args.length != 2) throw new LoginException("인자가 부족합니다. (형식: login <아이디> <비밀번호>)");
+        if (args.length != 2) throw new LoginException("인자의 개수가 올바르지 않습니다. (형식: login <아이디> <비밀번호>)");
 
         String username = args[0];
         String password = args[1];
