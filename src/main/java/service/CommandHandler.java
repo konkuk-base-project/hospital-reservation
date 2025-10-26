@@ -25,7 +25,6 @@ import service.search.DoctorCommand;
 import service.search.MyListCommand;
 import service.search.SearchService;
 
-
 public class CommandHandler {
     private final AuthContext authContext;
     private final Map<String, Command> commands;
@@ -38,9 +37,8 @@ public class CommandHandler {
         AuthService authService = new AuthService(patientRepository, authRepository, authContext);
 
         SearchService searchService = new SearchService(authContext);
-        ReservationService reservationService = new ReservationService(authContext);  // 추가
+        ReservationService reservationService = new ReservationService(authContext); // 추가
         AdminService adminService = new AdminService();
-
 
         this.commands = new HashMap<>();
         // 인증
@@ -62,7 +60,7 @@ public class CommandHandler {
         // 관리자 명령어
         commands.put("user", new UserSearchCommand(adminService));
         commands.put("reserve-list", new ReserveListCommand(adminService));
-        
+
         // 공통 명령어
         this.helpCommand = new HelpCommand(commands, "Main");
         commands.put("help", helpCommand);
@@ -85,30 +83,45 @@ public class CommandHandler {
         String[] args = Arrays.copyOfRange(tokens, 1, tokens.length);
 
         if ("exit".equals(commandName)) {
+
+            // exit 뒤에 인자가 있을 경우 — 오류 메시지 출력
+            if (tokens.length > 1) {
+                System.out.println("[오류] 불필요한 인자가 입력되었습니다. (형식: exit)");
+                return false;
+            }
+
             System.out.print("프로그램을 종료하시겠습니까? (Y/N): ");
             Scanner scanner = new Scanner(System.in);
             String confirm = scanner.nextLine();
+            // Y/y 입력
             if (confirm.equalsIgnoreCase("Y")) {
-                return true;
-            } else {
-                System.out.println("종료가 취소되었습니다.");
-                return false;
+                System.out.println("프로그램을 종료합니다. 감사합니다.");
+                System.out.println("[프로그램 종료]");
+                return true; 
             }
+
+            // N/n 입력
+            if (confirm.equalsIgnoreCase("N")) {
+                System.out.println("종료가 취소되었습니다.");
+                return false; 
+            }
+
+            // 별다른 메시지 없이 Main 프롬프트로 복귀
+            return false;
         }
 
         Command command = commands.get(commandName);
 
         if (commandName.equals("help") && command instanceof service.common.HelpCommand helpCmd) {
-        helpCmd.updateContext(authContext.getPrompt());
+            helpCmd.updateContext(authContext.getPrompt());
         }
 
         /* 관리자 전용 명령어 차단 로직 추가 */
         if (authContext.getPrompt().equals("User") &&
-        (commandName.equals("user") || commandName.equals("reserve-list"))) {
-        System.out.println("[오류] 알 수 없는 명령어입니다. 'help'를 입력하여 도움말을 확인하세요.");
-        return false;
+                (commandName.equals("user") || commandName.equals("reserve-list"))) {
+            System.out.println("[오류] 알 수 없는 명령어입니다. 'help'를 입력하여 도움말을 확인하세요.");
+            return false;
         }
-
 
         if (command != null) {
             command.execute(args);
