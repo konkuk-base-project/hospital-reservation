@@ -65,6 +65,7 @@ public class HelpCommand implements Command {
         System.out.println("check - 예약 조회");
         System.out.println("modify - 예약 수정");
         System.out.println("cancel - 예약 취소");
+        System.out.println("reserve-major - 진료과로 예약 생성");
         System.out.println("[조회 기능]");
         System.out.println("mylist - 내 예약 목록 전체 조회");
         System.out.println("dept - 진료과별 예약 가능 시간 검색");

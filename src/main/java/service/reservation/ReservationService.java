@@ -14,9 +14,9 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
+import util.file.VirtualTime;
 
 public class ReservationService {
     private final AuthContext authContext;
@@ -336,6 +336,83 @@ public class ReservationService {
             throw e;
         } catch (Exception e) {
             throw new ReservationException("예약 취소 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 6.2.5 진료과 예약 생성
+     */
+    public void reserveMajor(String[] args) throws ReservationException {
+        if (!authContext.isLoggedIn()) {
+            throw new ReservationException("로그인이 필요합니다.");
+        }
+
+        if (args.length != 3) {
+            throw new ReservationException("인자의 개수가 올바르지 않습니다 (형식: reserve-major <진료과코드> <날짜 YYYY-MM-DD> <시간 HH:MM>)");
+        }
+
+        String deptCode = args[0];
+        String dateStr = args[1];
+        String timeStr = args[2];
+
+        LocalDate date = validateDate(dateStr);
+        LocalTime time = validateTime(timeStr);
+
+        // 진료과 소속 의사 목록에서 예약 가능한 의사 찾기
+        String selectedDoctorId = null;
+        try {
+            List<String> doctorLines = FileUtil.readLines("data/doctor/doctorlist.txt");
+            for (int i = 1; i < doctorLines.size(); i++) {
+                String line = doctorLines.get(i).trim();
+                if (line.isEmpty()) continue;
+                String[] parts = line.split("\\s+");
+                if (parts.length < 3) continue;
+                String doctorId = parts[0];
+                String doctorDept = parts[2];
+                if (!deptCode.equals(doctorDept)) continue;
+
+                try {
+                    // 근무 시간 및 요일 확인
+                    validateDoctorWorkingHours(doctorId, date, time);
+                    // 해당 시간대 예약 가능 여부 확인 (파일 기반/스케줄 기반 모두 검사)
+                    validateTimeSlotAvailable(doctorId, date, timeStr);
+                    // 성공하면 해당 의사 선택
+                    selectedDoctorId = doctorId;
+                    break;
+                } catch (ReservationException ignore) {
+                    // 이 의사는 불가능하면 다음 의사 검사
+                }
+            }
+        } catch (IOException e) {
+            throw new ReservationException("의사 목록을 불러오는 중 오류가 발생했습니다.");
+        }
+
+        if (selectedDoctorId == null) {
+            throw new ReservationException("해당 진료과에서 예약 가능한 의사가 없습니다.");
+        }
+
+        try {
+            // 예약번호 생성
+            String reservationId = reservationRepository.getNextReservationId();
+
+            // 의사 정보
+            String[] doctorInfo = getDoctorInfo(selectedDoctorId);
+            String doctorName = doctorInfo[0];
+            String dept = doctorInfo[1];
+
+            // Appointment 파일에 예약 생성
+            appointmentRepository.createAppointment(date, selectedDoctorId, timeStr, reservationId);
+
+            // 환자 파일에 예약 추가
+            addReservationToPatientFile(reservationId, date, timeStr, dept, selectedDoctorId);
+
+            // 의사 파일에 예약 반영
+            updateDoctorSchedule(selectedDoctorId, date, timeStr, reservationId);
+
+            System.out.println("예약이 완료되었습니다. [예약번호: " + reservationId + ", 의사: " + doctorName + "]");
+
+        } catch (Exception e) {
+            throw new ReservationException("예약 생성 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
 
