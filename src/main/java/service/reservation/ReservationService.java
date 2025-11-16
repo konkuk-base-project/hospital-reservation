@@ -371,7 +371,7 @@ public class ReservationService {
     private LocalDate validateDate(String dateStr) throws ReservationException {
         try {
             LocalDate date = LocalDate.parse(dateStr, DATE_FORMATTER);
-            if (date.isBefore(LocalDate.now().plusDays(1))) {
+            if (date.isBefore(VirtualTime.currentDate().plusDays(1))) {
                 throw new ReservationException("과거 날짜로는 예약할 수 없습니다.");
             }
             return date;
