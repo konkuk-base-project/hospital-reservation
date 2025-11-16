@@ -12,6 +12,7 @@ import repository.PatientRepository;
 import service.AuthContext;
 import util.exception.LoginException;
 import util.exception.SignupException;
+import util.file.VirtualTime;
 import util.hash.PasswordHasher;
 
 public class AuthService {
@@ -119,8 +120,9 @@ public class AuthService {
     private void validateBirthDate(String birthDateStr) throws SignupException {
         try {
             LocalDate birthDate = LocalDate.parse(birthDateStr);
-            if (birthDate.isBefore(LocalDate.of(1900, 1, 1)) || birthDate.isAfter(LocalDate.now())) {
-                throw new SignupException("생년월일이 유효하지 않습니다. (1900-01-01부터 유효)");
+            LocalDate baseDate = VirtualTime.currentDate();
+            if (birthDate.isBefore(LocalDate.of(1900, 1, 1)) || birthDate.isAfter(baseDate)) {
+                throw new SignupException("생년월일이 유효하지 않습니다. (1900-01-01부터" + baseDate + "까지 유효)");
             }
         } catch (DateTimeParseException e) {
             throw new SignupException("생년월일 형식이 잘못되었습니다. (예: YYYY-MM-DD)");

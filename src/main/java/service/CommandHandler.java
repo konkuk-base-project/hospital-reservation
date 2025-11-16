@@ -20,6 +20,7 @@ import service.reservation.CheckCommand;
 import service.reservation.ModifyCommand;
 import service.reservation.ReservationService;
 import service.reservation.ReserveCommand;
+import service.reservation.ReserveMajorCommand;
 import service.search.DeptCommand;
 import service.search.DoctorCommand;
 import service.search.MyListCommand;
@@ -57,6 +58,7 @@ public class CommandHandler {
         commands.put("check", new CheckCommand(reservationService));
         commands.put("modify", new ModifyCommand(reservationService));
         commands.put("cancel", new CancelCommand(reservationService));
+        commands.put("reserve-major", new ReserveMajorCommand(reservationService));
 
         // 관리자 명령어
         commands.put("user", new UserSearchCommand(adminService));
