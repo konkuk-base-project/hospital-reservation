@@ -6,7 +6,7 @@ import service.Command;
 
 public class HelpCommand implements Command {
     private final Map<String, Command> commands;
-    private String context; // Main / User / Admin
+    private String context; // Main / User / Admin / Doctor
 
     public HelpCommand(Map<String, Command> commands, String context) {
         this.commands = commands;
@@ -35,6 +35,7 @@ public class HelpCommand implements Command {
         switch (context) {
             case "Admin" -> printAdminCommands();
             case "User" -> printUserCommands();
+            case "Doctor" -> printDoctorCommands();
             default -> printMainCommands();
         }
 
@@ -42,7 +43,8 @@ public class HelpCommand implements Command {
     }
 
     private void printMainCommands() {
-        System.out.println("signup - 새로운 회원 가입");
+        System.out.println("signup - 새로운 환자 회원 가입");
+        System.out.println("signup-doctor - 새로운 의사 회원가입");
         System.out.println("login - 기존 회원 로그인");
         System.out.println("help - 도움말 표시");
         System.out.println("exit - 프로그램 종료");
@@ -75,9 +77,20 @@ public class HelpCommand implements Command {
         System.out.println("help - 도움말 표시");
         System.out.println("exit - 프로그램 종료");
     }
-    
+
+    private void printDoctorCommands() {
+        System.out.println("[진료일정관리]");
+        System.out.println("set-schedule - 진료일정설정");
+        System.out.println("view-schedule - 진료일정조회");
+        System.out.println("modify-schedule - 진료일정수정");
+        System.out.println("delete-schedule - 진료일정삭제");
+        System.out.println("[시스템]");
+        System.out.println("logout - 로그아웃");
+        System.out.println("help - 도움말 표시");
+        System.out.println("exit - 프로그램 종료");
+    }
+
     public void updateContext(String context) {
-    // 프롬프트 상태("Main", "User", "Admin")를 바꿔줌
-    this.context = context;
+        this.context = context;
     }
 }
