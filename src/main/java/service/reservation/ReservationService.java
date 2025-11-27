@@ -1,21 +1,22 @@
 package service.reservation;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.List;
+import java.util.regex.Pattern;
+
 import model.User;
 import repository.AppointmentRepository;
 import repository.ReservationRepository;
 import service.AuthContext;
 import util.exception.ReservationException;
 import util.file.FileUtil;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.util.List;
-import java.util.regex.Pattern;
 import util.file.VirtualTime;
 
 public class ReservationService {
@@ -58,6 +59,14 @@ public class ReservationService {
 
         // 시간 검증
         LocalTime time = validateTime(timeStr);
+
+        LocalDateTime now = VirtualTime.currentDateTime();
+        LocalDateTime reservationTime = LocalDateTime.of(date, time);
+
+        // 같은 날이라도 시간이 과거면 예약 불가
+        if (reservationTime.isBefore(now)) {
+            throw new ReservationException("현재 가상 시간 이전의 시간으로는 예약할 수 없습니다.");
+        }
 
         // 의사 근무 시간 확인
         validateDoctorWorkingHours(doctorId, date, time);
@@ -146,9 +155,11 @@ public class ReservationService {
             String statusText = getStatusString(status);
 
             // 출력
-            System.out.println("======================================================================================");
+            System.out
+                    .println("======================================================================================");
             System.out.println("예약 상세 내역");
-            System.out.println("======================================================================================");
+            System.out
+                    .println("======================================================================================");
             System.out.println("예약번호: " + resId);
             System.out.println("날짜: " + resDate);
             System.out.println("시간: " + startTime + "-" + endTime);
@@ -190,6 +201,13 @@ public class ReservationService {
 
         // 시간 검증
         LocalTime newTime = validateTime(newTimeStr);
+
+        LocalDateTime now = VirtualTime.currentDateTime();
+        LocalDateTime reservationTime = LocalDateTime.of(newDate, newTime);
+
+        if (reservationTime.isBefore(now)) {
+            throw new ReservationException("현재 가상 시간 이전의 시간에는 수정할 수 없습니다.");
+        }
 
         try {
             User currentUser = authContext.getCurrentUser();
@@ -244,8 +262,7 @@ public class ReservationService {
             String endTime = calculateEndTime(newTimeStr);
             String newReservationLine = String.join(" ",
                     reservationId, newDateStr, newTimeStr, endTime,
-                    oldReservationParts[4], doctorId, "1"
-            );
+                    oldReservationParts[4], doctorId, "1");
             lines.set(reservationLineIndex, newReservationLine);
 
             Path patientFile = FileUtil.getResourcePath(patientFilePath);
@@ -358,18 +375,28 @@ public class ReservationService {
         LocalDate date = validateDate(dateStr);
         LocalTime time = validateTime(timeStr);
 
+        LocalDateTime now = VirtualTime.currentDateTime();
+        LocalDateTime reservationTime = LocalDateTime.of(date, time);
+
+        if (reservationTime.isBefore(now)) {
+            throw new ReservationException("현재 가상 시간 이전의 시간으로는 예약할 수 없습니다.");
+        }
+
         // 진료과 소속 의사 목록에서 예약 가능한 의사 찾기
         String selectedDoctorId = null;
         try {
             List<String> doctorLines = FileUtil.readLines("data/doctor/doctorlist.txt");
             for (int i = 1; i < doctorLines.size(); i++) {
                 String line = doctorLines.get(i).trim();
-                if (line.isEmpty()) continue;
+                if (line.isEmpty())
+                    continue;
                 String[] parts = line.split("\\s+");
-                if (parts.length < 3) continue;
+                if (parts.length < 3)
+                    continue;
                 String doctorId = parts[0];
                 String doctorDept = parts[2];
-                if (!deptCode.equals(doctorDept)) continue;
+                if (!deptCode.equals(doctorDept))
+                    continue;
 
                 try {
                     // 근무 시간 및 요일 확인
@@ -431,7 +458,8 @@ public class ReservationService {
             List<String> lines = FileUtil.readLines("data/doctor/doctorlist.txt");
             for (int i = 1; i < lines.size(); i++) {
                 String line = lines.get(i).trim();
-                if (line.isEmpty()) continue;
+                if (line.isEmpty())
+                    continue;
 
                 String[] parts = line.split("\\s+");
                 if (parts.length >= 2 && parts[1].equals(doctorIdOrName)) {
@@ -446,15 +474,26 @@ public class ReservationService {
     }
 
     private LocalDate validateDate(String dateStr) throws ReservationException {
+        LocalDate date;
+
+        // 먼저 문자열을 LocalDate로 파싱-> date가 생김
         try {
-            LocalDate date = LocalDate.parse(dateStr, DATE_FORMATTER);
-            if (date.isBefore(VirtualTime.currentDate().plusDays(1))) {
-                throw new ReservationException("과거 날짜로는 예약할 수 없습니다.");
-            }
-            return date;
+            date = LocalDate.parse(dateStr, DATE_FORMATTER);
         } catch (DateTimeParseException e) {
             throw new ReservationException("날짜 형식이 잘못되었습니다. (예: 2025-10-10)");
         }
+
+        LocalDateTime now = VirtualTime.currentDateTime();
+
+        // 날짜 + 시간 기준 비교
+        LocalDateTime reservationStart = LocalDateTime.of(date, LocalTime.MIN);
+
+        // 과거 불가
+        if (reservationStart.isBefore(now)) {
+            throw new ReservationException("가상 현재 시간 이후만 예약 가능합니다.");
+        }
+
+        return date;
     }
 
     private LocalTime validateTime(String timeStr) throws ReservationException {
@@ -470,7 +509,8 @@ public class ReservationService {
         }
     }
 
-    private void validateDoctorWorkingHours(String doctorId, LocalDate date, LocalTime time) throws ReservationException {
+    private void validateDoctorWorkingHours(String doctorId, LocalDate date, LocalTime time)
+            throws ReservationException {
         try {
             String doctorFilePath = "data/doctor/" + doctorId + ".txt";
             List<String> lines = FileUtil.readLines(doctorFilePath);
@@ -496,7 +536,17 @@ public class ReservationService {
         }
     }
 
-    private void validateTimeSlotAvailable(String doctorId, LocalDate date, String timeStr) throws ReservationException {
+    private void validateTimeSlotAvailable(String doctorId, LocalDate date, String timeStr)
+            throws ReservationException {
+
+        // 현재시간 이후인지 검사
+        LocalDateTime now = VirtualTime.currentDateTime();
+        LocalDateTime selected = LocalDateTime.of(date, LocalTime.parse(timeStr, TIME_FORMATTER));
+
+        if (selected.isBefore(now)) {
+            throw new ReservationException("현재 시간 이전 슬롯은 예약할 수 없습니다.");
+        }
+
         try {
             List<String> availableSlots = appointmentRepository.getAvailableTimeSlots(date, doctorId);
             if (!availableSlots.contains(timeStr)) {
@@ -537,7 +587,8 @@ public class ReservationService {
         // 의사 파일에서 해당 날짜 찾기
         for (int i = 3; i < lines.size(); i++) {
             String line = lines.get(i).trim();
-            if (line.isEmpty()) continue;
+            if (line.isEmpty())
+                continue;
 
             if (line.startsWith(dateStr)) {
                 String[] parts = line.split("\\s+");
@@ -557,10 +608,11 @@ public class ReservationService {
     private String[] getDoctorInfo(String doctorId) throws IOException {
         List<String> lines = FileUtil.readLines("data/doctor/" + doctorId + ".txt");
         String[] parts = lines.get(0).split("\\s+");
-        return new String[]{parts[1], parts[2]}; // [이름, 진료과코드]
+        return new String[] { parts[1], parts[2] }; // [이름, 진료과코드]
     }
 
-    private void addReservationToPatientFile(String reservationId, LocalDate date, String startTime, String deptCode, String doctorId) throws IOException {
+    private void addReservationToPatientFile(String reservationId, LocalDate date, String startTime, String deptCode,
+            String doctorId) throws IOException {
         User currentUser = authContext.getCurrentUser();
         String patientId = currentUser.getId();
         String patientFilePath = "data/patient/" + patientId + ".txt";
@@ -572,7 +624,8 @@ public class ReservationService {
         FileUtil.appendLine(patientFilePath, reservationLine);
     }
 
-    private void updateDoctorSchedule(String doctorId, LocalDate date, String timeStr, String value) throws IOException {
+    private void updateDoctorSchedule(String doctorId, LocalDate date, String timeStr, String value)
+            throws IOException {
         String doctorFilePath = "data/doctor/" + doctorId + ".txt";
         List<String> lines = FileUtil.readLines(doctorFilePath);
 
@@ -621,25 +674,39 @@ public class ReservationService {
 
     private String getDepartmentName(String code) {
         switch (code) {
-            case "IM": return "내과";
-            case "GS": return "일반외과";
-            case "OB": return "산부인과";
-            case "PED": return "소아과";
-            case "PSY": return "정신과";
-            case "DERM": return "피부과";
-            case "ENT": return "이비인후과";
-            case "ORTH": return "정형외과";
-            default: return code;
+            case "IM":
+                return "내과";
+            case "GS":
+                return "일반외과";
+            case "OB":
+                return "산부인과";
+            case "PED":
+                return "소아과";
+            case "PSY":
+                return "정신과";
+            case "DERM":
+                return "피부과";
+            case "ENT":
+                return "이비인후과";
+            case "ORTH":
+                return "정형외과";
+            default:
+                return code;
         }
     }
 
     private String getStatusString(String code) {
         switch (code) {
-            case "1": return "예약완료";
-            case "2": return "진료완료";
-            case "3": return "취소";
-            case "4": return "미방문";
-            default: return "알 수 없음";
+            case "1":
+                return "예약완료";
+            case "2":
+                return "진료완료";
+            case "3":
+                return "취소";
+            case "4":
+                return "미방문";
+            default:
+                return "알 수 없음";
         }
     }
 }
