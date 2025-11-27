@@ -10,6 +10,15 @@ import java.util.List;
 
 public class FileUtil {
 
+    public static void writeLines(String filePath, List<String> lines) {
+        try {
+            Path path = getResourcePath(filePath);
+            Files.write(path, lines);
+        } catch (IOException e) {
+            throw new RuntimeException("파일에 데이터를 쓰는 중 오류 발생: " + e.getMessage());
+        }
+    }
+
     public static List<String> readLines(String filePath) throws IOException {
         Path resourcePath = getResourcePath(filePath);
 
