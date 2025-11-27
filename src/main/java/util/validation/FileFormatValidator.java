@@ -1,17 +1,18 @@
 package util.validation;
 
-import repository.AppointmentRepository;
-import util.exception.AppointmentFileException;
-import util.exception.FileFormatException;
-import util.file.FileUtil;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+
+import repository.AppointmentRepository;
+import util.exception.AppointmentFileException;
+import util.exception.FileFormatException;
+import util.file.FileUtil;
 
 public class FileFormatValidator {
 
@@ -65,7 +66,8 @@ public class FileFormatValidator {
             // 데이터 행 검증
             for (int i = 1; i < lines.size(); i++) {
                 String line = lines.get(i).trim();
-                if (line.isEmpty()) continue;
+                if (line.isEmpty())
+                    continue;
 
                 String[] parts = line.split("\\s+");
                 if (parts.length != 5) {
@@ -110,7 +112,8 @@ public class FileFormatValidator {
             // 데이터 행 검증
             for (int i = 1; i < lines.size(); i++) {
                 String line = lines.get(i).trim();
-                if (line.isEmpty()) continue;
+                if (line.isEmpty())
+                    continue;
 
                 String[] parts = line.split("\\s+");
                 if (parts.length != 3) {
@@ -137,49 +140,32 @@ public class FileFormatValidator {
         try {
             List<String> lines = FileUtil.readLines(filePath);
 
+            // --------------------------------------------
+            // ★ 기획서 4.6.1: 파일이 없거나 비어있으면 기본값 생성이 정상 동작
+            // --------------------------------------------
             if (lines.isEmpty()) {
+                // 기본 BASE_TIME 파일 생성하도록 VirtualTime.load() 로 위임
+                util.file.VirtualTime.setTime(LocalDateTime.of(2025, 10, 1, 9, 0, 0));
+                return; // 검증 통과
+            }
+
+            // BASE_TIME 한 줄만 존재해야 함
+            if (lines.size() != 1 || !lines.get(0).startsWith("BASE_TIME=")) {
                 throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
 
-            boolean hasBaseTime = false;
-            boolean hasLastSave = false;
-            boolean hasProgramStart = false;
+            // 값 검증
+            String[] parts = lines.get(0).split("=");
+            if (parts.length != 2) {
+                throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+            }
 
+            String value = parts[1].trim();
             Pattern datetimePattern = Pattern.compile("^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$");
-
-            for (String line : lines) {
-                line = line.trim();
-                if (line.isEmpty()) continue;
-
-                String[] parts = line.split("=");
-                if (parts.length != 2) {
-                    throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
-                }
-
-                String key = parts[0].trim();
-                String value = parts[1].trim();
-
-                if (key.equals("BASE_TIME")) {
-                    hasBaseTime = true;
-                    if (!datetimePattern.matcher(value).matches()) {
-                        throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
-                    }
-                } else if (key.equals("LAST_SAVE")) {
-                    hasLastSave = true;
-                    if (!datetimePattern.matcher(value).matches()) {
-                        throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
-                    }
-                } else if (key.equals("PROGRAM_START")) {
-                    hasProgramStart = true;
-                    if (!datetimePattern.matcher(value).matches()) {
-                        throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
-                    }
-                }
-            }
-
-            if (!hasBaseTime || !hasLastSave || !hasProgramStart) {
+            if (!datetimePattern.matcher(value).matches()) {
                 throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
+
         } catch (IOException e) {
             throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
         }
@@ -203,7 +189,8 @@ public class FileFormatValidator {
             // 데이터 행 검증
             for (int i = 1; i < lines.size(); i++) {
                 String line = lines.get(i).trim();
-                if (line.isEmpty()) continue;
+                if (line.isEmpty())
+                    continue;
 
                 String[] parts = line.split("\\s+");
                 if (parts.length != 4) {
@@ -237,7 +224,8 @@ public class FileFormatValidator {
 
             for (int i = 1; i < lines.size(); i++) {
                 String line = lines.get(i).trim();
-                if (line.isEmpty()) continue;
+                if (line.isEmpty())
+                    continue;
 
                 String[] parts = line.split("\\s+");
                 if (parts.length > 0) {
@@ -245,7 +233,8 @@ public class FileFormatValidator {
                     String detailFilePath = "data/patient/" + patientId + ".txt";
 
                     if (!FileUtil.resourceExists(detailFilePath)) {
-                        throw new FileFormatException("[오류] '/data/patient/patientlist.txt'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                        throw new FileFormatException(
+                                "[오류] '/data/patient/patientlist.txt'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                     }
 
                     validatePatientDetailFile(patientId);
@@ -294,7 +283,8 @@ public class FileFormatValidator {
             // 4행부터: 예약 내역 검증
             for (int i = 3; i < lines.size(); i++) {
                 String line = lines.get(i).trim();
-                if (line.isEmpty()) continue;
+                if (line.isEmpty())
+                    continue;
 
                 String[] parts = line.split("\\s+");
                 if (parts.length != 7) {
@@ -342,7 +332,8 @@ public class FileFormatValidator {
 
             for (int i = 1; i < lines.size(); i++) {
                 String line = lines.get(i).trim();
-                if (line.isEmpty()) continue;
+                if (line.isEmpty())
+                    continue;
 
                 String[] parts = line.split("\\s+");
                 if (parts.length > 0) {
@@ -350,7 +341,8 @@ public class FileFormatValidator {
                     String detailFilePath = "data/doctor/" + doctorId + ".txt";
 
                     if (!FileUtil.resourceExists(detailFilePath)) {
-                        throw new FileFormatException("[오류] '/data/doctor/doctorlist.txt'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                        throw new FileFormatException(
+                                "[오류] '/data/doctor/doctorlist.txt'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                     }
 
                     validateDoctorDetailFile(doctorId);
@@ -401,7 +393,8 @@ public class FileFormatValidator {
             // 4행부터: 스케줄 검증
             for (int i = 3; i < lines.size(); i++) {
                 String line = lines.get(i).trim();
-                if (line.isEmpty()) continue;
+                if (line.isEmpty())
+                    continue;
 
                 String[] parts = line.split("\\s+");
                 if (parts.length != 55) { // 날짜 1개 + 슬롯 54개
@@ -438,33 +431,34 @@ public class FileFormatValidator {
 
             try (Stream<Path> files = Files.list(appointmentDir)) {
                 files.filter(path -> path.toString().endsWith(".txt"))
-                     .filter(path -> !path.getFileName().toString().contains("backup"))
-                     .forEach(path -> {
-                         String fileName = path.getFileName().toString();
-                         // YYYYMMDD.txt 형식 파일만 검증
-                         if (fileName.matches("\\d{8}\\.txt")) {
-                             try {
-                                 // 파일명에서 날짜 추출
-                                 String dateStr = fileName.replace(".txt", "");
-                                 int year = Integer.parseInt(dateStr.substring(0, 4));
-                                 int month = Integer.parseInt(dateStr.substring(4, 6));
-                                 int day = Integer.parseInt(dateStr.substring(6, 8));
-                                 LocalDate date = LocalDate.of(year, month, day);
+                        .filter(path -> !path.getFileName().toString().contains("backup"))
+                        .forEach(path -> {
+                            String fileName = path.getFileName().toString();
+                            // YYYYMMDD.txt 형식 파일만 검증
+                            if (fileName.matches("\\d{8}\\.txt")) {
+                                try {
+                                    // 파일명에서 날짜 추출
+                                    String dateStr = fileName.replace(".txt", "");
+                                    int year = Integer.parseInt(dateStr.substring(0, 4));
+                                    int month = Integer.parseInt(dateStr.substring(4, 6));
+                                    int day = Integer.parseInt(dateStr.substring(6, 8));
+                                    LocalDate date = LocalDate.of(year, month, day);
 
-                                 // AppointmentRepository를 통해 검증
-                                 repository.getAppointmentsByDate(date);
+                                    // AppointmentRepository를 통해 검증
+                                    repository.getAppointmentsByDate(date);
 
-                             } catch (AppointmentFileException e) {
-                                 String filePath = "data/appointment/" + fileName;
-                                 String errorMsg = String.format("[오류] '/%s'의 형식이 올바르지 않습니다. %s 프로그램을 종료합니다.",
-                                     filePath, e.getMessage());
-                                 throw new FileFormatException(errorMsg);
-                             } catch (Exception e) {
-                                 String filePath = "data/appointment/" + fileName;
-                                 throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
-                             }
-                         }
-                     });
+                                } catch (AppointmentFileException e) {
+                                    String filePath = "data/appointment/" + fileName;
+                                    String errorMsg = String.format("[오류] '/%s'의 형식이 올바르지 않습니다. %s 프로그램을 종료합니다.",
+                                            filePath, e.getMessage());
+                                    throw new FileFormatException(errorMsg);
+                                } catch (Exception e) {
+                                    String filePath = "data/appointment/" + fileName;
+                                    throw new FileFormatException(
+                                            "[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                                }
+                            }
+                        });
             }
         } catch (IOException e) {
             throw new FileFormatException("[오류] 예약 파일 검증 중 오류가 발생했습니다. 프로그램을 종료합니다.");
