@@ -28,6 +28,9 @@ public class AuthContext {
         if ("ADMIN".equals(currentUser.getRole())) {
             return "Admin";
         }
+        if ("DOCTOR".equals(currentUser.getRole())) {
+            return "Doctor";
+        }
         return "User";
     }
 }
