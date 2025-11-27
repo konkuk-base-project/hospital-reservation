@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Scanner;
 
 import repository.AuthRepository;
+import repository.DoctorRepository;
 import repository.PatientRepository;
 import service.admin.AdminService;
 import service.admin.ReserveListCommand;
@@ -17,6 +18,11 @@ import service.auth.LoginCommand;
 import service.auth.LogoutCommand;
 import service.auth.SignupCommand;
 import service.common.HelpCommand;
+import service.doctor.DeleteScheduleCommand;
+import service.doctor.DoctorService;
+import service.doctor.ModifyScheduleCommand;
+import service.doctor.SetScheduleCommand;
+import service.doctor.ViewScheduleCommand;
 import service.reservation.CancelCommand;
 import service.reservation.CheckCommand;
 import service.reservation.ModifyCommand;
@@ -37,16 +43,20 @@ public class CommandHandler {
     public CommandHandler() {
         this.authContext = new AuthContext();
         PatientRepository patientRepository = new PatientRepository();
+        DoctorRepository doctorRepository = new DoctorRepository(); // 추가
         AuthRepository authRepository = new AuthRepository();
-        AuthService authService = new AuthService(patientRepository, authRepository, authContext);
+        AuthService authService = new AuthService(patientRepository, doctorRepository, authRepository, authContext); // 수정
 
         SearchService searchService = new SearchService(authContext);
-        ReservationService reservationService = new ReservationService(authContext); // 추가
+        ReservationService reservationService = new ReservationService(authContext);
         AdminService adminService = new AdminService();
+        DoctorService doctorService = new DoctorService(authContext); // 추가
 
         this.commands = new HashMap<>();
+
         // 인증
-        commands.put("signup", new SignupCommand(authService));
+        commands.put("signup", new SignupCommand(authService, false)); // 수정
+        commands.put("signup-doctor", new SignupCommand(authService, true)); // 추가
         commands.put("login", new LoginCommand(authService));
         commands.put("logout", new LogoutCommand(authService));
 
@@ -65,6 +75,12 @@ public class CommandHandler {
         // 관리자 명령어
         commands.put("user", new UserSearchCommand(adminService));
         commands.put("reserve-list", new ReserveListCommand(adminService));
+
+        // 의사 명령어 (추가)
+        commands.put("set-schedule", new SetScheduleCommand(doctorService));
+        commands.put("view-schedule", new ViewScheduleCommand(doctorService));
+        commands.put("modify-schedule", new ModifyScheduleCommand(doctorService));
+        commands.put("delete-schedule", new DeleteScheduleCommand(doctorService));
 
         // 공통 명령어
         this.helpCommand = new HelpCommand(commands, "Main");
@@ -124,8 +140,16 @@ public class CommandHandler {
         }
 
         // 관리자 전용 명령어 접근 차단
-        if (authContext.getPrompt().equals("User") &&
+        if (!authContext.getPrompt().equals("Admin") &&
                 (commandName.equals("user") || commandName.equals("reserve-list"))) {
+            System.out.println("[오류] 알 수 없는 명령어입니다. 'help'를 입력하여 도움말을 확인하세요.");
+            return false;
+        }
+
+        // 의사 전용 명령어 접근 차단 (추가)
+        if (!authContext.getPrompt().equals("Doctor") &&
+                (commandName.equals("set-schedule") || commandName.equals("view-schedule") ||
+                        commandName.equals("modify-schedule") || commandName.equals("delete-schedule"))) {
             System.out.println("[오류] 알 수 없는 명령어입니다. 'help'를 입력하여 도움말을 확인하세요.");
             return false;
         }
