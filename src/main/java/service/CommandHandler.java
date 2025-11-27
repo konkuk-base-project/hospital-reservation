@@ -1,5 +1,7 @@
 package service;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -68,19 +70,28 @@ public class CommandHandler {
         this.helpCommand = new HelpCommand(commands, "Main");
         commands.put("help", helpCommand);
 
+        // 가상시간
+        commands.put("time", args -> {
+            LocalDateTime now = util.file.VirtualTime.currentDateTime();
+            System.out.println("[현재 가상 시간] " + now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+        });
+
+        // 가상시간 설정
+        commands.put("settime", args -> handleSetTime(args));
+
         // 새로운 명령어 추가 시 여기 등록
 
     }
 
     public String readCommand(Scanner scanner) {
-    return scanner.nextLine();
-}
+        return scanner.nextLine();
+    }
 
     public String getPrompt() {
         return authContext.getPrompt();
     }
 
-    public boolean handle(String input, Scanner scanner) { 
+    public boolean handle(String input, Scanner scanner) {
         if (input.trim().isEmpty()) {
             return false;
         }
@@ -90,24 +101,23 @@ public class CommandHandler {
         String[] args = Arrays.copyOfRange(tokens, 1, tokens.length);
 
         if ("exit".equals(commandName)) {
-    if (tokens.length > 1) {
-        System.out.println("[오류] 불필요한 인자가 입력되었습니다. (형식: exit)");
-        return false;
-    }
+            if (tokens.length > 1) {
+                System.out.println("[오류] 불필요한 인자가 입력되었습니다. (형식: exit)");
+                return false;
+            }
 
-    System.out.print("프로그램을 종료하시겠습니까? (Y/N): ");
-    String confirm = scanner.nextLine().trim(); 
+            System.out.print("프로그램을 종료하시겠습니까? (Y/N): ");
+            String confirm = scanner.nextLine().trim();
 
-    if (confirm.equalsIgnoreCase("Y")) {
-        System.out.println("프로그램을 종료합니다. 감사합니다.");
-        System.out.println("[프로그램 종료]");
-        return true;
-    }
+            if (confirm.equalsIgnoreCase("Y")) {
+                System.out.println("프로그램을 종료합니다. 감사합니다.");
+                System.out.println("[프로그램 종료]");
+                return true;
+            }
 
-    System.out.println("종료가 취소되었습니다.");
-    return false;
-}
-
+            System.out.println("종료가 취소되었습니다.");
+            return false;
+        }
 
         if (commandName.equals("help") && commands.get("help") instanceof HelpCommand helpCmd) {
             helpCmd.updateContext(authContext.getPrompt());
@@ -130,4 +140,63 @@ public class CommandHandler {
 
         return false;
     }
+
+    // ===========================
+    // settime 명령어 처리
+    // ===========================
+    private void handleSetTime(String[] args) {
+        if (args.length < 2) {
+            System.out.println("[오류] 인자의 개수가 올바르지 않습니다. (형식: settime <날짜 YYYY-MM-DD> <시간 HH:MM>)");
+            return;
+        }
+
+        String dateStr = args[0];
+        String timeStr = args[1];
+
+        // 날짜 형식 검증
+        if (!dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$")) {
+            System.out.println("[오류] 날짜 형식이 잘못되었습니다. (예: 2025-10-10)");
+            return;
+        }
+
+        // 시간 형식 검증
+        if (!timeStr.matches("^\\d{2}:\\d{2}$")) {
+            System.out.println("[오류] 시간 형식이 잘못되었습니다. (예: 14:30, 00:00~23:59)");
+            return;
+        }
+
+        // 초 자동 추가
+        String full = dateStr + " " + timeStr + ":00";
+
+        try {
+            LocalDateTime newTime = LocalDateTime.parse(full,
+                    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+            // 현재 가상시간
+            LocalDateTime now = util.file.VirtualTime.currentDateTime();
+
+            // 설정 범위: 현재 이후 ~ 2025-12-31
+            LocalDateTime max = LocalDateTime.of(2025, 12, 31, 23, 59);
+
+            if (newTime.isBefore(now)) {
+                System.out.println("[오류] 과거 시간으로 되돌릴 수 없습니다. (현재: " +
+                        now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + ")");
+                return;
+            }
+
+            if (newTime.isAfter(max)) {
+                System.out.println("[오류] 설정 가능한 시간 범위를 벗어났습니다. (현재 시간 이후 ~ 2025-12-31)");
+                return;
+            }
+
+            util.file.VirtualTime.setTime(newTime);
+
+            System.out.println("가상 시간이 설정되었습니다.");
+            System.out.println("현재 가상 시간: " + newTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+
+        } catch (Exception e) {
+            System.out.println("[오류] 시간 형식이 잘못되었습니다. (예: 14:30, 00:00~23:59)");
+        }
+    }
+
 }
