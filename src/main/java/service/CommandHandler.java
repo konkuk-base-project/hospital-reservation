@@ -153,15 +153,25 @@ public class CommandHandler {
         String dateStr = args[0];
         String timeStr = args[1];
 
-        // 날짜 형식 검증
-        if (!dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$")) {
-            System.out.println("[오류] 날짜 형식이 잘못되었습니다. (예: 2025-10-10)");
+        // 기본 형식 체크
+        if (!timeStr.matches("^\\d{2}:\\d{2}$")) {
+            System.out.println("[오류] 시간 형식이 잘못되었습니다. (예: 14:30, 00:00~23:59)");
             return;
         }
 
-        // 시간 형식 검증
-        if (!timeStr.matches("^\\d{2}:\\d{2}$")) {
+        String[] timeParts = timeStr.split(":");
+        int HH = Integer.parseInt(timeParts[0]);
+        int MM = Integer.parseInt(timeParts[1]);
+
+        // 24:00 방지
+        if (HH < 0 || HH > 23 || MM < 0 || MM > 59) {
             System.out.println("[오류] 시간 형식이 잘못되었습니다. (예: 14:30, 00:00~23:59)");
+            return;
+        }
+
+        // 날짜 형식 검증
+        if (!dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$")) {
+            System.out.println("[오류] 날짜 형식이 잘못되었습니다. (예: 2025-10-10)");
             return;
         }
 
