@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalTime;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -317,4 +318,454 @@ public class DoctorService {
             default -> -1;
         };
     }
+
+    /**
+     * 6.6.5 예약 상태 처리 (진료 완료)
+     */
+    public void completeAppointment(String[] args) throws DoctorScheduleException {
+        if (!authContext.isLoggedIn() || !"DOCTOR".equals(authContext.getCurrentUser().getRole())) {
+            throw new DoctorScheduleException("의사 계정만 사용할 수 있습니다.");
+        }
+
+        if (args.length != 1) {
+            throw new DoctorScheduleException("인자의 개수가 올바르지 않습니다. (형식: complete <예약번호>)");
+        }
+
+        String reservationId = args[0];
+
+        // 예약번호 형식 검증
+        if (!reservationId.matches("^R\\d{8}$")) {
+            throw new DoctorScheduleException("예약번호 형식이 잘못되었습니다. (예: R00000001)");
+        }
+
+        try {
+            User currentUser = authContext.getCurrentUser();
+            String doctorId = currentUser.getId();
+
+            // 예약 정보 찾기
+            ReservationInfo resInfo = findReservationInfo(reservationId, doctorId);
+
+            if (resInfo == null) {
+                throw new DoctorScheduleException("존재하지 않는 예약번호입니다.");
+            }
+
+            // 본인의 예약인지 확인
+            if (!resInfo.doctorId.equals(doctorId)) {
+                throw new DoctorScheduleException("본인의 예약만 처리할 수 있습니다. (담당 의사: " + getDoctorNameById(resInfo.doctorId) + ")");
+            }
+
+            // 예약 상태 확인 (1: 예약완료만 처리 가능)
+            if (!resInfo.status.equals("1")) {
+                String statusText = getStatusText(resInfo.status);
+                throw new DoctorScheduleException("이미 처리된 예약입니다. (현재 상태: " + statusText + ")");
+            }
+
+            // 예약 시간 경과 확인
+            LocalDate currentDate = util.file.VirtualTime.currentDate();
+            LocalDate resDate = LocalDate.parse(resInfo.date, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+            if (resDate.isAfter(currentDate)) {
+                throw new DoctorScheduleException(String.format(
+                        "예약 시간이 아직 경과하지 않았습니다. (예약 시간: %s %s, 현재: %s)",
+                        resInfo.date, resInfo.startTime, currentDate
+                ));
+            }
+
+            // 환자 파일 업데이트 (상태 1 -> 2)
+            updatePatientReservationStatus(resInfo.patientId, reservationId, "2");
+
+            System.out.println("예약이 진료완료 처리되었습니다.");
+            System.out.println("- 예약번호: " + reservationId);
+            System.out.println("- 환자: " + resInfo.patientName + " (" + resInfo.patientId + ")");
+            System.out.println("- 진료: " + resInfo.date + " " + resInfo.startTime + "-" + resInfo.endTime + " | " + getDeptName(resInfo.deptCode) + " | " + getDoctorNameById(doctorId));
+
+        } catch (IOException e) {
+            throw new DoctorScheduleException("진료 완료 처리 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 6.6.6 예약 상태 처리 (노쇼)
+     */
+    public void noshowAppointment(String[] args) throws DoctorScheduleException {
+        if (!authContext.isLoggedIn() || !"DOCTOR".equals(authContext.getCurrentUser().getRole())) {
+            throw new DoctorScheduleException("의사 계정만 사용할 수 있습니다.");
+        }
+
+        if (args.length != 1) {
+            throw new DoctorScheduleException("인자의 개수가 올바르지 않습니다. (형식: noshow <예약번호>)");
+        }
+
+        String reservationId = args[0];
+
+        // 예약번호 형식 검증
+        if (!reservationId.matches("^R\\d{8}$")) {
+            throw new DoctorScheduleException("예약번호 형식이 잘못되었습니다. (예: R00000001)");
+        }
+
+        try {
+            User currentUser = authContext.getCurrentUser();
+            String doctorId = currentUser.getId();
+
+            // 예약 정보 찾기
+            ReservationInfo resInfo = findReservationInfo(reservationId, doctorId);
+
+            if (resInfo == null) {
+                throw new DoctorScheduleException("존재하지 않는 예약번호입니다.");
+            }
+
+            // 본인의 예약인지 확인
+            if (!resInfo.doctorId.equals(doctorId)) {
+                throw new DoctorScheduleException("본인의 예약만 처리할 수 있습니다. (담당 의사: " + getDoctorNameById(resInfo.doctorId) + ")");
+            }
+
+            // 예약 상태 확인 (1: 예약완료만 처리 가능)
+            if (!resInfo.status.equals("1")) {
+                String statusText = getStatusText(resInfo.status);
+                throw new DoctorScheduleException("이미 처리된 예약입니다. (현재 상태: " + statusText + ")");
+            }
+
+            // 예약 시간 경과 확인
+            LocalDate currentDate = util.file.VirtualTime.currentDate();
+            LocalDate resDate = LocalDate.parse(resInfo.date, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+            if (resDate.isAfter(currentDate)) {
+                throw new DoctorScheduleException(String.format(
+                        "예약 시간이 아직 경과하지 않았습니다. (예약 시간: %s %s, 현재: %s)",
+                        resInfo.date, resInfo.startTime, currentDate
+                ));
+            }
+
+            // 환자 파일 업데이트 (상태 1 -> 4)
+            updatePatientReservationStatus(resInfo.patientId, reservationId, "4");
+
+            // 노쇼 횟수 증가
+            int noshowCount = incrementNoshowCount(resInfo.patientId);
+
+            System.out.println("예약이 노쇼 처리되었습니다.");
+            System.out.println("- 예약번호: " + reservationId);
+            System.out.println("- 환자: " + resInfo.patientName + " (" + resInfo.patientId + ")");
+            System.out.println("- 진료: " + resInfo.date + " " + resInfo.startTime + "-" + resInfo.endTime + " | " + getDeptName(resInfo.deptCode) + " | " + getDoctorNameById(doctorId));
+            System.out.println("- 노쇼 누적: " + noshowCount + "회");
+
+            if (noshowCount >= 3) {
+                System.out.println("[경고] 해당 환자는 노쇼 3회로 예약 제한 대상입니다.");
+            }
+
+        } catch (IOException e) {
+            throw new DoctorScheduleException("노쇼 처리 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 6.6.7 처리 가능한 예약 목록 조회
+     */
+    public void showPendingAppointments(String[] args) throws DoctorScheduleException {
+        if (!authContext.isLoggedIn() || !"DOCTOR".equals(authContext.getCurrentUser().getRole())) {
+            throw new DoctorScheduleException("의사 계정만 사용할 수 있습니다.");
+        }
+
+        if (args.length != 0) {
+            throw new DoctorScheduleException("인자가 없어야 합니다.");
+        }
+
+        try {
+            User currentUser = authContext.getCurrentUser();
+            String doctorId = currentUser.getId();
+            LocalDate currentDate = util.file.VirtualTime.currentDate();
+
+            List<ReservationInfo> pendingReservations = new ArrayList<>();
+
+            // 모든 환자 파일에서 처리 대기 중인 예약 찾기
+            List<String> patientList = FileUtil.readLines("data/patient/patientlist.txt");
+
+            for (int i = 1; i < patientList.size(); i++) {
+                String line = patientList.get(i).trim();
+                if (line.isEmpty()) continue;
+
+                String[] parts = line.split("\\s+");
+                if (parts.length < 5) continue;
+
+                String patientId = parts[0];
+                String patientName = parts[2];
+                String patientFilePath = "data/patient/" + patientId + ".txt";
+
+                if (!FileUtil.resourceExists(patientFilePath)) continue;
+
+                List<String> patientLines = FileUtil.readLines(patientFilePath);
+
+                // 4행부터 예약 내역
+                for (int j = 3; j < patientLines.size(); j++) {
+                    String reservationLine = patientLines.get(j).trim();
+                    if (reservationLine.isEmpty()) continue;
+
+                    String[] resParts = reservationLine.split("\\s+");
+                    if (resParts.length < 7) continue;
+
+                    String reservationId = resParts[0];
+                    String date = resParts[1];
+                    String startTime = resParts[2];
+                    String endTime = resParts[3];
+                    String deptCode = resParts[4];
+                    String resDoctorId = resParts[5];
+                    String status = resParts[6];
+
+                    // 본인의 예약이고, 상태가 1(예약완료)이고, 예약 시간이 경과한 경우
+                    if (resDoctorId.equals(doctorId) && status.equals("1")) {
+                        LocalDate resDate = LocalDate.parse(date, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+                        if (!resDate.isAfter(currentDate)) {
+                            ReservationInfo info = new ReservationInfo();
+                            info.reservationId = reservationId;
+                            info.patientId = patientId;
+                            info.patientName = patientName;
+                            info.date = date;
+                            info.startTime = startTime;
+                            info.endTime = endTime;
+                            info.deptCode = deptCode;
+                            info.doctorId = resDoctorId;
+                            info.status = status;
+
+                            pendingReservations.add(info);
+                        }
+                    }
+                }
+            }
+
+            // 출력
+            System.out.println("======================================================================================");
+            System.out.println("처리 대기 중인 예약 (총 " + pendingReservations.size() + "건)");
+            System.out.println("======================================================================================");
+
+            if (pendingReservations.isEmpty()) {
+                System.out.println("처리 대기 중인 예약이 없습니다.");
+            } else {
+                // 날짜 순으로 정렬
+                pendingReservations.sort((a, b) -> {
+                    int dateCompare = a.date.compareTo(b.date);
+                    if (dateCompare != 0) return dateCompare;
+                    return a.startTime.compareTo(b.startTime);
+                });
+
+                for (ReservationInfo info : pendingReservations) {
+                    System.out.printf("%s | %s %s-%s | %s | %s (%s)%n",
+                            info.reservationId,
+                            info.date,
+                            info.startTime,
+                            info.endTime,
+                            getDeptName(info.deptCode),
+                            info.patientName,
+                            info.patientId
+                    );
+                }
+            }
+            System.out.println("======================================================================================");
+
+        } catch (IOException e) {
+            throw new DoctorScheduleException("처리 대기 예약 조회 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+    // ========== 헬퍼 메서드 ==========
+
+    /**
+     * 예약 정보 찾기
+     */
+    private ReservationInfo findReservationInfo(String reservationId, String doctorId) throws IOException {
+        // 모든 환자 파일을 검색하여 예약 정보 찾기
+        List<String> patientList = FileUtil.readLines("data/patient/patientlist.txt");
+
+        for (int i = 1; i < patientList.size(); i++) {
+            String line = patientList.get(i).trim();
+            if (line.isEmpty()) continue;
+
+            String[] parts = line.split("\\s+");
+            if (parts.length < 5) continue;
+
+            String patientId = parts[0];
+            String patientName = parts[2];
+            String patientFilePath = "data/patient/" + patientId + ".txt";
+
+            if (!FileUtil.resourceExists(patientFilePath)) continue;
+
+            List<String> patientLines = FileUtil.readLines(patientFilePath);
+
+            // 4행부터 예약 내역
+            for (int j = 3; j < patientLines.size(); j++) {
+                String reservationLine = patientLines.get(j).trim();
+                if (reservationLine.isEmpty()) continue;
+
+                String[] resParts = reservationLine.split("\\s+");
+                if (resParts.length < 7) continue;
+
+                if (resParts[0].equals(reservationId)) {
+                    ReservationInfo info = new ReservationInfo();
+                    info.reservationId = resParts[0];
+                    info.patientId = patientId;
+                    info.patientName = patientName;
+                    info.date = resParts[1];
+                    info.startTime = resParts[2];
+                    info.endTime = resParts[3];
+                    info.deptCode = resParts[4];
+                    info.doctorId = resParts[5];
+                    info.status = resParts[6];
+                    return info;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 환자 파일의 예약 상태 업데이트
+     */
+    private void updatePatientReservationStatus(String patientId, String reservationId, String newStatus) throws IOException {
+        String patientFilePath = "data/patient/" + patientId + ".txt";
+        List<String> lines = FileUtil.readLines(patientFilePath);
+
+        for (int i = 3; i < lines.size(); i++) {
+            String line = lines.get(i).trim();
+            if (line.isEmpty()) continue;
+
+            String[] parts = line.split("\\s+");
+            if (parts.length >= 7 && parts[0].equals(reservationId)) {
+                parts[6] = newStatus;
+                lines.set(i, String.join(" ", parts));
+                break;
+            }
+        }
+
+        Path patientFile = FileUtil.getResourcePath(patientFilePath);
+        Files.write(patientFile, lines);
+    }
+
+    /**
+     * 노쇼 횟수 증가
+     */
+    private int incrementNoshowCount(String patientId) throws IOException {
+        String patientFilePath = "data/patient/" + patientId + ".txt";
+        List<String> lines = FileUtil.readLines(patientFilePath);
+
+        // 1행: 환자 기본 정보에서 노쇼 횟수 증가
+        String[] parts = lines.get(0).split("\\s+");
+        int noshowCount = 0;
+
+        if (parts.length >= 5) {
+            // 기존에 노쇼 횟수가 있으면 파싱
+            try {
+                noshowCount = Integer.parseInt(parts[4]);
+            } catch (NumberFormatException e) {
+                noshowCount = 0;
+            }
+        }
+
+        noshowCount++;
+
+        // 노쇼 횟수가 4개 요소인 경우 추가, 5개인 경우 수정
+        if (parts.length == 4) {
+            lines.set(0, String.join(" ", parts[0], parts[1], parts[2], parts[3], String.valueOf(noshowCount)));
+        } else {
+            parts[4] = String.valueOf(noshowCount);
+            lines.set(0, String.join(" ", parts));
+        }
+
+        Path patientFile = FileUtil.getResourcePath(patientFilePath);
+        Files.write(patientFile, lines);
+
+        // patientlist.txt도 업데이트
+        updatePatientListNoshowCount(patientId, noshowCount);
+
+        return noshowCount;
+    }
+
+    /**
+     * patientlist.txt의 노쇼 횟수 업데이트
+     */
+    private void updatePatientListNoshowCount(String patientId, int noshowCount) throws IOException {
+        String patientListPath = "data/patient/patientlist.txt";
+        List<String> lines = FileUtil.readLines(patientListPath);
+
+        for (int i = 1; i < lines.size(); i++) {
+            String line = lines.get(i).trim();
+            if (line.isEmpty()) continue;
+
+            String[] parts = line.split("\\s+");
+            if (parts.length >= 5 && parts[0].equals(patientId)) {
+                if (parts.length == 5) {
+                    lines.set(i, String.join(" ", parts[0], parts[1], parts[2], parts[3], parts[4], String.valueOf(noshowCount)));
+                } else {
+                    parts[5] = String.valueOf(noshowCount);
+                    lines.set(i, String.join(" ", parts));
+                }
+                break;
+            }
+        }
+
+        Path patientListFile = FileUtil.getResourcePath(patientListPath);
+        Files.write(patientListFile, lines);
+    }
+
+    /**
+     * 의사 이름 조회
+     */
+    private String getDoctorNameById(String doctorId) {
+        try {
+            List<String> lines = FileUtil.readLines("data/doctor/" + doctorId + ".txt");
+            if (!lines.isEmpty()) {
+                String[] parts = lines.get(0).split("\\s+");
+                return parts[1];
+            }
+        } catch (IOException e) {
+            // 오류 시 doctorId 반환
+        }
+        return doctorId;
+    }
+
+    /**
+     * 진료과 이름 반환
+     */
+    private String getDeptName(String code) {
+        return switch (code) {
+            case "IM" -> "내과";
+            case "GS" -> "일반외과";
+            case "OB" -> "산부인과";
+            case "PED" -> "소아과";
+            case "PSY" -> "정신과";
+            case "DERM" -> "피부과";
+            case "ENT" -> "이비인후과";
+            case "ORTH" -> "정형외과";
+            default -> code;
+        };
+    }
+
+    /**
+     * 예약 상태 텍스트 반환
+     */
+    private String getStatusText(String code) {
+        return switch (code) {
+            case "1" -> "예약완료";
+            case "2" -> "진료완료";
+            case "3" -> "취소";
+            case "4" -> "노쇼";
+            default -> "알 수 없음";
+        };
+    }
+
+    /**
+     * 예약 정보를 담는 내부 클래스
+     */
+    private static class ReservationInfo {
+        String reservationId;
+        String patientId;
+        String patientName;
+        String date;
+        String startTime;
+        String endTime;
+        String deptCode;
+        String doctorId;
+        String status;
+    }
+
+
 }

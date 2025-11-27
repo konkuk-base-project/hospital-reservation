@@ -84,6 +84,10 @@ public class HelpCommand implements Command {
         System.out.println("view-schedule - 진료일정조회");
         System.out.println("modify-schedule - 진료일정수정");
         System.out.println("delete-schedule - 진료일정삭제");
+        System.out.println("[예약 관리]");
+        System.out.println("complete - 예약을 진료완료 처리");
+        System.out.println("noshow - 예약을 노쇼 처리");
+        System.out.println("pending - 처리 대기 중인 예약 목록 조회");
         System.out.println("[시스템]");
         System.out.println("logout - 로그아웃");
         System.out.println("help - 도움말 표시");

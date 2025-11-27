@@ -74,6 +74,14 @@ public class ReservationService {
         // 예약 가능 여부 확인
         validateTimeSlotAvailable(doctorId, date, timeStr);
 
+        // 노쇼 횟수 확인 (3회 이상이면 예약 불가)
+        User currentUser = authContext.getCurrentUser();
+        String patientId = currentUser.getId();
+        int noshowCount = getPatientNoshowCount(patientId);
+        if (noshowCount >= 3) {
+            throw new ReservationException("노쇼 3회 누적으로 예약이 제한되었습니다. (현재 노쇼 누적: " + noshowCount + "회)");
+        }
+
         try {
             // 예약번호 생성
             String reservationId = reservationRepository.getNextReservationId();
@@ -381,6 +389,14 @@ public class ReservationService {
         if (reservationTime.isBefore(now)) {
             throw new ReservationException("현재 가상 시간 이전의 시간으로는 예약할 수 없습니다.");
         }
+        // 노쇼 횟수 확인 (3회 이상이면 예약 불가)
+        User currentUser = authContext.getCurrentUser();
+        String patientId = currentUser.getId();
+        int noshowCount = getPatientNoshowCount(patientId);
+        if (noshowCount >= 3) {
+            throw new ReservationException("노쇼 3회 누적으로 예약이 제한되었습니다. (현재 노쇼 누적: " + noshowCount + "회)");
+
+        }
 
         // 진료과 소속 의사 목록에서 예약 가능한 의사 찾기
         String selectedDoctorId = null;
@@ -571,6 +587,30 @@ public class ReservationService {
         } catch (Exception e) {
             // 그 외 예외만 감싸서 던지기
             throw new ReservationException("예약 가능 시간을 확인하는 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 환자의 노쇼 누적 횟수 조회
+     */
+    private int getPatientNoshowCount(String patientId) throws ReservationException {
+        try {
+            String patientFilePath = "data/patient/" + patientId + ".txt";
+            List<String> lines = FileUtil.readLines(patientFilePath);
+
+            if (lines.isEmpty()) return 0;
+
+            String[] parts = lines.get(0).split("\\s+");
+            if (parts.length >= 5) {
+                try {
+                    return Integer.parseInt(parts[4]);
+                } catch (NumberFormatException e) {
+                    return 0;
+                }
+            }
+            return 0;
+        } catch (IOException e) {
+            throw new ReservationException("환자 정보를 조회하는 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
 
