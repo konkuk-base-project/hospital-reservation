@@ -21,6 +21,9 @@ import service.doctor.SetScheduleCommand;
 import service.doctor.ViewScheduleCommand;
 import service.doctor.ModifyScheduleCommand;
 import service.doctor.DeleteScheduleCommand;
+import service.doctor.CompleteCommand;
+import service.doctor.NoshowCommand;
+import service.doctor.PendingCommand;
 import service.reservation.CancelCommand;
 import service.reservation.CheckCommand;
 import service.reservation.ModifyCommand;
@@ -79,6 +82,9 @@ public class CommandHandler {
         commands.put("view-schedule", new ViewScheduleCommand(doctorService));
         commands.put("modify-schedule", new ModifyScheduleCommand(doctorService));
         commands.put("delete-schedule", new DeleteScheduleCommand(doctorService));
+        commands.put("complete", new CompleteCommand(doctorService));
+        commands.put("noshow", new NoshowCommand(doctorService));
+        commands.put("pending", new PendingCommand(doctorService));
 
         // 공통 명령어
         this.helpCommand = new HelpCommand(commands, "Main");
@@ -135,7 +141,9 @@ public class CommandHandler {
         // 의사 전용 명령어 접근 차단 (추가)
         if (!authContext.getPrompt().equals("Doctor") &&
                 (commandName.equals("set-schedule") || commandName.equals("view-schedule") ||
-                        commandName.equals("modify-schedule") || commandName.equals("delete-schedule"))) {
+                        commandName.equals("modify-schedule") || commandName.equals("delete-schedule") ||
+                        commandName.equals("complete") || commandName.equals("noshow") ||
+                        commandName.equals("pending"))) {
             System.out.println("[오류] 알 수 없는 명령어입니다. 'help'를 입력하여 도움말을 확인하세요.");
             return false;
         }
