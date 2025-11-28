@@ -60,7 +60,7 @@ public class AuthService {
             patientRepository.save(newPatient);
 
             String hashedPassword = PasswordHasher.hash(password);
-            User newUser = new User(username, hashedPassword, "USER", newPatientId);
+            User newUser = new User(username, hashedPassword, "PATIENT", newPatientId);
             authRepository.save(newUser);
 
             return "회원가입이 완료되었습니다. [환자번호: " + newPatientId + "]";

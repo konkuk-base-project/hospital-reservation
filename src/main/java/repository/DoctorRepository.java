@@ -25,9 +25,17 @@ public class DoctorRepository {
                 String line = lines.get(i);
                 if (line.trim().isEmpty()) continue;
                 String[] parts = line.split("\\s+");
-                if (parts.length == 3) {
-                    // doctorlist.txt에는 username이 없으므로 임시로 null 처리
-                    Doctor doctor = new Doctor(parts[0], null, parts[1], parts[2], null);
+                if (parts.length == 5) {
+                    // 새 형식: doctorId name deptCode phoneNumber registrationDate
+                    Doctor doctor = new Doctor(parts[0], null, parts[1], parts[2], parts[3], parts[4]);
+                    doctors.add(doctor);
+                    int currentNum = Integer.parseInt(parts[0].substring(1));
+                    if (currentNum > lastDoctorNumber) {
+                        lastDoctorNumber = currentNum;
+                    }
+                } else if (parts.length == 3) {
+                    // 하위 호환성: 기존 형식 지원 (username과 phoneNumber, registrationDate는 null)
+                    Doctor doctor = new Doctor(parts[0], null, parts[1], parts[2], null, null);
                     doctors.add(doctor);
                     int currentNum = Integer.parseInt(parts[0].substring(1));
                     if (currentNum > lastDoctorNumber) {
@@ -52,10 +60,18 @@ public class DoctorRepository {
         Path filePath = Paths.get(DOCTOR_DIR_PATH, doctor.getDoctorId() + ".txt");
         String header = doctor.toDetailFileHeaderString();
         String weekdaySchedule = "0 0 0 0 0"; // 초기에는 모든 요일 진료 불가
-        List<String> content = List.of(header, weekdaySchedule, "");
+
+        // 파일 내용: 헤더, 요일 정보, 빈 행, 날짜별 스케줄 섹션 빈 행, 요일별 정기 일정 섹션
+        List<String> content = List.of(
+                header,
+                weekdaySchedule,
+                ""
+                // 날짜별 스케줄은 예약 생성 시 추가됨
+                // 요일별 정기 일정은 의사가 설정할 때 추가됨
+        );
         FileUtil.createDirectoriesAndWrite(filePath, content);
 
-        // D00001-master.txt 파일 생성
+        // D00001-master.txt 파일 생성 (하위 호환성 유지)
         Path masterFilePath = Paths.get(DOCTOR_DIR_PATH, doctor.getDoctorId() + "-master.txt");
         List<String> masterContent = List.of(
                 "MON 0 0",

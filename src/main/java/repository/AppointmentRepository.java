@@ -84,7 +84,9 @@ public class AppointmentRepository {
 
         List<String> availableSlots = new ArrayList<>();
         for (TimeSlot slot : data.timeSlots) {
-            if ("0".equals(slot.statuses[doctorIndex])) {
+            String status = slot.statuses[doctorIndex];
+            // "0" (예약 가능) 또는 취소된 예약(상태코드 3)만 예약 가능
+            if ("0".equals(status) || (status.contains("(3)"))) {
                 availableSlots.add(slot.time);
             }
         }
@@ -123,15 +125,16 @@ public class AppointmentRepository {
 
         // 예약 가능 여부 확인
         String currentStatus = data.timeSlots.get(timeSlotIndex).statuses[doctorIndex];
-        if (!"0".equals(currentStatus)) {
+        // "0" 또는 취소된 예약(상태코드 3)만 예약 가능
+        if (!"0".equals(currentStatus) && !currentStatus.contains("(3)")) {
             throw new AppointmentFileException(
                     AppointmentFileException.ErrorType.INVALID_APPOINTMENT_STATUS,
                     String.format("해당 시간대는 예약할 수 없습니다. 현재 상태: %s", currentStatus)
             );
         }
 
-        // 예약 번호로 업데이트
-        data.timeSlots.get(timeSlotIndex).statuses[doctorIndex] = reservationId;
+        // 예약 번호로 업데이트 (상태코드 1: 예약완료)
+        data.timeSlots.get(timeSlotIndex).statuses[doctorIndex] = reservationId + "(1)";
 
         // 파일에 저장
         saveAppointmentData(date, data);
@@ -207,8 +210,9 @@ public class AppointmentRepository {
         boolean found = false;
         for (TimeSlot slot : data.timeSlots) {
             for (int i = 0; i < slot.statuses.length; i++) {
-                if (reservationId.equals(slot.statuses[i])) {
-                    slot.statuses[i] = "0"; // 예약 가능 상태로 변경
+                // 예약번호만 비교 (상태코드 제외)
+                if (slot.statuses[i].startsWith(reservationId + "(")) {
+                    slot.statuses[i] = reservationId + "(3)"; // 상태코드 3: 취소
                     found = true;
                     break;
                 }

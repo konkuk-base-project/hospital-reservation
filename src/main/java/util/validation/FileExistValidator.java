@@ -10,7 +10,8 @@ public class FileExistValidator {
             "data/patient/patientlist.txt",
             "data/doctor/doctorlist.txt",
             "data/time/virtualtime.txt",
-            "data/auth/credentials.txt"
+            "data/auth/credentials.txt",
+            "data/major/majorlist.txt"
     );
 
     public void validate() {

@@ -29,12 +29,14 @@ public class FileFormatValidator {
 
         try {
             validatePatientListFile();
+            validateMajorListFile();
             validateDoctorListFile();
             validateVirtualTimeFile();
             validateCredentialsFile();
             validatePatientDetailFiles();
             validateDoctorDetailFiles();
             validateAppointmentFiles();
+            validateDoctorMajorCodeConsistency();
 
             System.out.println(" 성공");
         } catch (FileFormatException e) {
@@ -198,13 +200,17 @@ public class FileFormatValidator {
                 }
 
                 // 계정 타입 검증
-                if (!parts[2].equals("USER") && !parts[2].equals("ADMIN")) {
+                if (!parts[2].equals("PATIENT") && !parts[2].equals("DOCTOR") && !parts[2].equals("ADMIN")) {
                     throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                 }
 
                 // 식별번호 형식 검증
-                if (parts[2].equals("USER")) {
+                if (parts[2].equals("PATIENT")) {
                     if (!PATIENT_ID_PATTERN.matcher(parts[3]).matches()) {
+                        throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                    }
+                } else if (parts[2].equals("DOCTOR")) {
+                    if (!DOCTOR_ID_PATTERN.matcher(parts[3]).matches()) {
                         throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                     }
                 } else if (parts[2].equals("ADMIN")) {
@@ -462,6 +468,84 @@ public class FileFormatValidator {
             }
         } catch (IOException e) {
             throw new FileFormatException("[오류] 예약 파일 검증 중 오류가 발생했습니다. 프로그램을 종료합니다.");
+        }
+    }
+
+    private void validateMajorListFile() {
+        String filePath = "data/major/majorlist.txt";
+        Pattern majorCodePattern = Pattern.compile("^[A-Z]{2,4}$");
+
+        try {
+            List<String> lines = FileUtil.readLines(filePath);
+
+            if (lines.isEmpty()) {
+                throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+            }
+
+            // 헤더 검증
+            String header = lines.get(0).trim();
+            if (!header.equals("[진료과코드] [진료과명]")) {
+                throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+            }
+
+            // 데이터 행 검증
+            for (int i = 1; i < lines.size(); i++) {
+                String line = lines.get(i).trim();
+                if (line.isEmpty())
+                    continue;
+
+                String[] parts = line.split("\\s+", 2);
+                if (parts.length != 2) {
+                    throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                }
+
+                // 진료과 코드 형식 검증 (대문자 로마자 2-4자)
+                if (!majorCodePattern.matcher(parts[0]).matches()) {
+                    throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                }
+            }
+        } catch (IOException e) {
+            throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+        }
+    }
+
+    private void validateDoctorMajorCodeConsistency() {
+        try {
+            // majorlist.txt에서 진료과 코드 목록 읽기
+            List<String> majorLines = FileUtil.readLines("data/major/majorlist.txt");
+            java.util.Set<String> validMajorCodes = new java.util.HashSet<>();
+
+            for (int i = 1; i < majorLines.size(); i++) {
+                String line = majorLines.get(i).trim();
+                if (line.isEmpty()) continue;
+
+                String[] parts = line.split("\\s+", 2);
+                if (parts.length >= 1) {
+                    validMajorCodes.add(parts[0]);
+                }
+            }
+
+            // doctorlist.txt에서 의사들의 진료과 코드 검증
+            List<String> doctorLines = FileUtil.readLines("data/doctor/doctorlist.txt");
+
+            for (int i = 1; i < doctorLines.size(); i++) {
+                String line = doctorLines.get(i).trim();
+                if (line.isEmpty()) continue;
+
+                String[] parts = line.split("\\s+");
+                if (parts.length >= 3) {
+                    String majorCode = parts[2];
+
+                    // 진료과 코드가 majorlist.txt에 존재하는지 확인
+                    if (!validMajorCodes.contains(majorCode)) {
+                        throw new FileFormatException(
+                            "[오류] 진료과 코드 불일치: " + majorCode + "은(는) '/data/major/majorlist.txt'에 존재하지 않습니다. 프로그램을 종료합니다."
+                        );
+                    }
+                }
+            }
+        } catch (IOException e) {
+            throw new FileFormatException("[오류] 진료과 코드 불일치 검증 중 오류가 발생했습니다. 프로그램을 종료합니다.");
         }
     }
 }

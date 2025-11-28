@@ -15,7 +15,7 @@ public class AppointmentFileValidator {
     private static final Pattern DATE_PATTERN = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
     private static final Pattern DOCTOR_ID_PATTERN = Pattern.compile("D\\d{5}");
     private static final Pattern TIME_PATTERN = Pattern.compile("\\d{2}:\\d{2}");
-    private static final Pattern RESERVATION_ID_PATTERN = Pattern.compile("R\\d{8}");
+    private static final Pattern RESERVATION_ID_PATTERN = Pattern.compile("R\\d{8}\\([1-4]\\)");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -219,7 +219,7 @@ public class AppointmentFileValidator {
     /**
      * 예약 상태를 검증합니다
      *
-     * @param status 예약 상태 (0, R######## 또는 X)
+     * @param status 예약 상태 (0, R########(1-4) 또는 X)
      * @param lineNumber 라인 번호
      * @param columnNumber 열 번호
      * @throws AppointmentFileException 형식이 올바르지 않은 경우
@@ -246,14 +246,15 @@ public class AppointmentFileValidator {
             return;
         }
 
-        // R######## (예약 번호)
+        // R########(1-4) (예약 번호와 상태 코드)
+        // 1:예약완료, 2:진료완료, 3:취소, 4:노쇼
         if (RESERVATION_ID_PATTERN.matcher(trimmedStatus).matches()) {
             return;
         }
 
         throw new AppointmentFileException(
             AppointmentFileException.ErrorType.INVALID_APPOINTMENT_STATUS,
-            String.format("열 %d: 잘못된 예약 상태 '%s' (0, X 또는 R######## 형식이어야 합니다)",
+            String.format("열 %d: 잘못된 예약 상태 '%s' (0, X 또는 R########(1-4) 형식이어야 합니다)",
                 columnNumber, trimmedStatus),
             lineNumber
         );
