@@ -7,12 +7,7 @@ public class Doctor {
     private final String deptCode;
     private final String phoneNumber;
     private final String registrationDate;
-
-    public Doctor(String doctorId, String username, String name, String deptCode, String phoneNumber) {
-        this(doctorId, username, name, deptCode, phoneNumber, null);
-    }
-
-    public Doctor(String doctorId, String username, String name, String deptCode, String phoneNumber, String registrationDate) {
+    public Doctor(String doctorId, String username, String name, String deptCode, String phoneNumber,  String registrationDate) {
         this.doctorId = doctorId;
         this.username = username;
         this.name = name;

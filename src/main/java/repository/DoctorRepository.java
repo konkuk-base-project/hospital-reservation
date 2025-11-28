@@ -24,19 +24,20 @@ public class DoctorRepository {
             for (int i = 1; i < lines.size(); i++) {
                 String line = lines.get(i);
                 if (line.trim().isEmpty()) continue;
+
                 String[] parts = line.split("\\s+");
-                if (parts.length == 5) {
-                    // 새 형식: doctorId name deptCode phoneNumber registrationDate
-                    Doctor doctor = new Doctor(parts[0], null, parts[1], parts[2], parts[3], parts[4]);
+                if (parts.length >= 5) {
+                    Doctor doctor = new Doctor(
+                            parts[0],  // doctorId
+                            null,      // username
+                            parts[1],  // name
+                            parts[2],  // deptCode
+                            parts[3],  // phoneNumber
+                            parts[4]   // registrationDate
+                    );
+
                     doctors.add(doctor);
-                    int currentNum = Integer.parseInt(parts[0].substring(1));
-                    if (currentNum > lastDoctorNumber) {
-                        lastDoctorNumber = currentNum;
-                    }
-                } else if (parts.length == 3) {
-                    // 하위 호환성: 기존 형식 지원 (username과 phoneNumber, registrationDate는 null)
-                    Doctor doctor = new Doctor(parts[0], null, parts[1], parts[2], null, null);
-                    doctors.add(doctor);
+
                     int currentNum = Integer.parseInt(parts[0].substring(1));
                     if (currentNum > lastDoctorNumber) {
                         lastDoctorNumber = currentNum;

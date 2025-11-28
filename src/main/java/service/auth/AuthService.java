@@ -2,6 +2,7 @@ package service.auth;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -92,7 +93,19 @@ public class AuthService {
 
         try {
             String newDoctorId = doctorRepository.getNextDoctorId();
-            Doctor newDoctor = new Doctor(newDoctorId, username, name, deptCode, phoneNumber);
+
+            String registrationDate = LocalDate.now()
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+            Doctor newDoctor = new Doctor(
+                    newDoctorId,
+                    username,
+                    name,
+                    deptCode,
+                    phoneNumber,
+                    registrationDate
+            );
+
             doctorRepository.save(newDoctor);
 
             String hashedPassword = PasswordHasher.hash(password);
