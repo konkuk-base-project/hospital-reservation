@@ -24,11 +24,19 @@ public class DoctorRepository {
             for (int i = 1; i < lines.size(); i++) {
                 String line = lines.get(i);
                 if (line.trim().isEmpty()) continue;
+
                 String[] parts = line.split("\\s+");
-                if (parts.length == 3) {
-                    // doctorlist.txt에는 username이 없으므로 임시로 null 처리
-                    Doctor doctor = new Doctor(parts[0], null, parts[1], parts[2], null);
+                if (parts.length >= 5) {
+                    Doctor doctor = new Doctor(
+                            parts[0],  // doctorId
+                            null,      // username
+                            parts[1],  // name
+                            parts[2],  // deptCode
+                            parts[3],  // phoneNumber
+                            parts[4]   // registrationDate
+                    );
                     doctors.add(doctor);
+
                     int currentNum = Integer.parseInt(parts[0].substring(1));
                     if (currentNum > lastDoctorNumber) {
                         lastDoctorNumber = currentNum;

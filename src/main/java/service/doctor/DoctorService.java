@@ -2,6 +2,7 @@ package service.doctor;
 
 import model.User;
 import service.AuthContext;
+import service.doctor.helper.PatientFileReader;
 import util.exception.DoctorScheduleException;
 import util.file.FileUtil;
 
@@ -202,14 +203,46 @@ public class DoctorService {
             String oldStart = parts[1];
             String oldEnd = parts[2];
 
+            LocalDate currentDate = util.file.VirtualTime.currentDate();
+            List<PatientFileReader.ReservationData> affectedReservations =
+                    PatientFileReader.findFutureReservationsByDoctorAndTimeRange(
+                            doctorId, dayCode, currentDate, startTime, endTime);
+
+            if (!affectedReservations.isEmpty()) {
+                System.out.println("[경고] 다음 미래 예약이 새 일정 범위를 벗어나므로 자동 취소됩니다:");
+                for (PatientFileReader.ReservationData res : affectedReservations) {
+                    System.out.printf("- %s (%s) | %s | %s-%s | %s (%s)%n",
+                            res.date, getDayOfWeekInKorean(res.date),
+                            res.reservationId, res.startTime, res.endTime,
+                            res.patientName, res.patientId);
+                }
+
+                System.out.print("\n이 예약들을 취소하고 일정을 수정하시겠습니까? (Y/N): ");
+                Scanner scanner = new Scanner(System.in);
+                String confirm = scanner.nextLine().trim();
+
+                if (!confirm.equalsIgnoreCase("Y")) {
+                    System.out.println("일정 수정이 취소되었습니다.");
+                    return;
+                }
+
+                for (PatientFileReader.ReservationData res : affectedReservations) {
+                    cancelReservation(res.patientId, res.reservationId);
+                }
+
+                System.out.printf("\n%d건의 미래 예약이 자동 취소되었습니다.%n",
+                        affectedReservations.size());
+            }
+
             // 일정 변경
             lines.set(dayIndex, dayCode + " " + startTime + " " + endTime);
             Path masterFile = FileUtil.getResourcePath(masterFilePath);
             Files.write(masterFile, lines);
 
-            System.out.println("진료 일정이 수정되었습니다.");
+            System.out.println(DAY_MAP_ENG_TO_KOR.get(dayCode) + "의 진료 일정이 수정되었습니다.");
             System.out.println("- 기존: " + oldStart + " ~ " + oldEnd);
             System.out.println("- 변경: " + startTime + " ~ " + endTime);
+            System.out.println("\n[안내] 과거 예약은 그대로 유지됩니다.");
 
         } catch (IOException e) {
             throw new DoctorScheduleException("진료 일정 수정 중 오류가 발생했습니다: " + e.getMessage());
@@ -248,8 +281,25 @@ public class DoctorService {
                 throw new DoctorScheduleException("설정된 진료 일정이 없습니다.");
             }
 
+            LocalDate currentDate = util.file.VirtualTime.currentDate();
+            List<PatientFileReader.ReservationData> futureReservations =
+                    PatientFileReader.findFutureReservationsByDoctorAndDay(
+                            doctorId, dayCode, currentDate);
+
+            if (!futureReservations.isEmpty()) {
+                System.out.println("[경고] 다음 미래 예약이 자동으로 취소됩니다:");
+                for (PatientFileReader.ReservationData res : futureReservations) {
+                    System.out.printf("- %s (%s) | %s | %s-%s | %s (%s)%n",
+                            res.date, getDayOfWeekInKorean(res.date),
+                            res.reservationId, res.startTime, res.endTime,
+                            res.patientName, res.patientId);
+                }
+                System.out.println();
+            }
+
             // 확인 메시지 출력
-            System.out.print(DAY_MAP_ENG_TO_KOR.get(dayCode) + "의 진료 일정을 삭제하시겠습니까? (Y/N): ");
+            System.out.print(DAY_MAP_ENG_TO_KOR.get(dayCode) +
+                    "의 진료 일정을 삭제하시겠습니까? (Y/N): ");
             Scanner scanner = new Scanner(System.in);
             String confirm = scanner.nextLine().trim();
 
@@ -258,12 +308,22 @@ public class DoctorService {
                 return;
             }
 
+            // 예약 취소 처리
+            if (!futureReservations.isEmpty()) {
+                for (PatientFileReader.ReservationData res : futureReservations) {
+                    cancelReservation(res.patientId, res.reservationId);
+                }
+                System.out.printf("\n%d건의 미래 예약이 자동 취소되었습니다.%n",
+                        futureReservations.size());
+            }
+
             // 일정 삭제 (0 0으로 설정)
             lines.set(dayIndex, dayCode + " 0 0");
             Path masterFile = FileUtil.getResourcePath(masterFilePath);
             Files.write(masterFile, lines);
 
             System.out.println(DAY_MAP_ENG_TO_KOR.get(dayCode) + "의 진료 일정이 삭제되었습니다.");
+            System.out.println("[안내] 과거 예약은 그대로 유지됩니다.");
 
         } catch (IOException e) {
             throw new DoctorScheduleException("진료 일정 삭제 중 오류가 발생했습니다: " + e.getMessage());
@@ -342,8 +402,8 @@ public class DoctorService {
             User currentUser = authContext.getCurrentUser();
             String doctorId = currentUser.getId();
 
-            // 예약 정보 찾기
-            ReservationInfo resInfo = findReservationInfo(reservationId, doctorId);
+            PatientFileReader.ReservationData resInfo =
+                    PatientFileReader.findReservationById(reservationId);
 
             if (resInfo == null) {
                 throw new DoctorScheduleException("존재하지 않는 예약번호입니다.");
@@ -407,8 +467,8 @@ public class DoctorService {
             User currentUser = authContext.getCurrentUser();
             String doctorId = currentUser.getId();
 
-            // 예약 정보 찾기
-            ReservationInfo resInfo = findReservationInfo(reservationId, doctorId);
+            PatientFileReader.ReservationData resInfo =
+                    PatientFileReader.findReservationById(reservationId);
 
             if (resInfo == null) {
                 throw new DoctorScheduleException("존재하지 않는 예약번호입니다.");
@@ -474,63 +534,8 @@ public class DoctorService {
             String doctorId = currentUser.getId();
             LocalDate currentDate = util.file.VirtualTime.currentDate();
 
-            List<ReservationInfo> pendingReservations = new ArrayList<>();
-
-            // 모든 환자 파일에서 처리 대기 중인 예약 찾기
-            List<String> patientList = FileUtil.readLines("data/patient/patientlist.txt");
-
-            for (int i = 1; i < patientList.size(); i++) {
-                String line = patientList.get(i).trim();
-                if (line.isEmpty()) continue;
-
-                String[] parts = line.split("\\s+");
-                if (parts.length < 5) continue;
-
-                String patientId = parts[0];
-                String patientName = parts[2];
-                String patientFilePath = "data/patient/" + patientId + ".txt";
-
-                if (!FileUtil.resourceExists(patientFilePath)) continue;
-
-                List<String> patientLines = FileUtil.readLines(patientFilePath);
-
-                // 4행부터 예약 내역
-                for (int j = 3; j < patientLines.size(); j++) {
-                    String reservationLine = patientLines.get(j).trim();
-                    if (reservationLine.isEmpty()) continue;
-
-                    String[] resParts = reservationLine.split("\\s+");
-                    if (resParts.length < 7) continue;
-
-                    String reservationId = resParts[0];
-                    String date = resParts[1];
-                    String startTime = resParts[2];
-                    String endTime = resParts[3];
-                    String deptCode = resParts[4];
-                    String resDoctorId = resParts[5];
-                    String status = resParts[6];
-
-                    // 본인의 예약이고, 상태가 1(예약완료)이고, 예약 시간이 경과한 경우
-                    if (resDoctorId.equals(doctorId) && status.equals("1")) {
-                        LocalDate resDate = LocalDate.parse(date, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-
-                        if (!resDate.isAfter(currentDate)) {
-                            ReservationInfo info = new ReservationInfo();
-                            info.reservationId = reservationId;
-                            info.patientId = patientId;
-                            info.patientName = patientName;
-                            info.date = date;
-                            info.startTime = startTime;
-                            info.endTime = endTime;
-                            info.deptCode = deptCode;
-                            info.doctorId = resDoctorId;
-                            info.status = status;
-
-                            pendingReservations.add(info);
-                        }
-                    }
-                }
-            }
+            List<PatientFileReader.ReservationData> pendingReservations =
+                    PatientFileReader.findPendingReservationsByDoctor(doctorId, currentDate);
 
             // 출력
             System.out.println("======================================================================================");
@@ -547,7 +552,7 @@ public class DoctorService {
                     return a.startTime.compareTo(b.startTime);
                 });
 
-                for (ReservationInfo info : pendingReservations) {
+                for (PatientFileReader.ReservationData info : pendingReservations) {
                     System.out.printf("%s | %s %s-%s | %s | %s (%s)%n",
                             info.reservationId,
                             info.date,
@@ -566,56 +571,7 @@ public class DoctorService {
         }
     }
 
-    // ========== 헬퍼 메서드 ==========
-
-    /**
-     * 예약 정보 찾기
-     */
-    private ReservationInfo findReservationInfo(String reservationId, String doctorId) throws IOException {
-        // 모든 환자 파일을 검색하여 예약 정보 찾기
-        List<String> patientList = FileUtil.readLines("data/patient/patientlist.txt");
-
-        for (int i = 1; i < patientList.size(); i++) {
-            String line = patientList.get(i).trim();
-            if (line.isEmpty()) continue;
-
-            String[] parts = line.split("\\s+");
-            if (parts.length < 5) continue;
-
-            String patientId = parts[0];
-            String patientName = parts[2];
-            String patientFilePath = "data/patient/" + patientId + ".txt";
-
-            if (!FileUtil.resourceExists(patientFilePath)) continue;
-
-            List<String> patientLines = FileUtil.readLines(patientFilePath);
-
-            // 4행부터 예약 내역
-            for (int j = 3; j < patientLines.size(); j++) {
-                String reservationLine = patientLines.get(j).trim();
-                if (reservationLine.isEmpty()) continue;
-
-                String[] resParts = reservationLine.split("\\s+");
-                if (resParts.length < 7) continue;
-
-                if (resParts[0].equals(reservationId)) {
-                    ReservationInfo info = new ReservationInfo();
-                    info.reservationId = resParts[0];
-                    info.patientId = patientId;
-                    info.patientName = patientName;
-                    info.date = resParts[1];
-                    info.startTime = resParts[2];
-                    info.endTime = resParts[3];
-                    info.deptCode = resParts[4];
-                    info.doctorId = resParts[5];
-                    info.status = resParts[6];
-                    return info;
-                }
-            }
-        }
-
-        return null;
-    }
+    // ========== 파일 업데이트 헬퍼 메서드 ==========
 
     /**
      * 환자 파일의 예약 상태 업데이트
@@ -638,6 +594,14 @@ public class DoctorService {
 
         Path patientFile = FileUtil.getResourcePath(patientFilePath);
         Files.write(patientFile, lines);
+    }
+
+    /**
+     * 예약 취소 처리
+     */
+    private void cancelReservation(String patientId, String reservationId)
+            throws IOException {
+        updatePatientReservationStatus(patientId, reservationId, "3");
     }
 
     /**
@@ -706,6 +670,8 @@ public class DoctorService {
         Files.write(patientListFile, lines);
     }
 
+    // ========== 기타 헬퍼 메서드 ==========
+
     /**
      * 의사 이름 조회
      */
@@ -753,19 +719,19 @@ public class DoctorService {
     }
 
     /**
-     * 예약 정보를 담는 내부 클래스
+     * 날짜의 요일을 한글로 반환
      */
-    private static class ReservationInfo {
-        String reservationId;
-        String patientId;
-        String patientName;
-        String date;
-        String startTime;
-        String endTime;
-        String deptCode;
-        String doctorId;
-        String status;
+    private String getDayOfWeekInKorean(String dateStr) {
+        LocalDate date = LocalDate.parse(dateStr,
+                DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        return switch (date.getDayOfWeek()) {
+            case MONDAY -> "월";
+            case TUESDAY -> "화";
+            case WEDNESDAY -> "수";
+            case THURSDAY -> "목";
+            case FRIDAY -> "금";
+            case SATURDAY -> "토";
+            case SUNDAY -> "일";
+        };
     }
-
-
 }
