@@ -97,28 +97,35 @@ public class OrphanDataValidator {
 
         // 2. 실제 존재하는 의사 데이터 파일 수집
         Path doctorDir = FileUtil.getResourcePath("data/doctor");
-        Set<String> existingDoctorIds = new HashSet<>();
+        Set<String> orphanDoctorFiles = new HashSet<>();
 
         try (Stream<Path> files = Files.list(doctorDir)) {
-            existingDoctorIds = files
+            files
                 .filter(path -> path.toString().endsWith(".txt"))
                 .filter(path -> !path.getFileName().toString().equals("doctorlist.txt"))
-                .map(path -> {
+                .forEach(path -> {
                     String fileName = path.getFileName().toString();
-                    return fileName.replace(".txt", ""); // D00001.txt -> D00001
-                })
-                .filter(id -> id.matches("^D\\d{5}$")) // D00001 형식만 필터링
-                .collect(Collectors.toSet());
+                    String fileNameWithoutExt = fileName.replace(".txt", "");
+
+                    // D00001.txt 또는 D00001-master.txt 형식인지 확인
+                    String doctorId;
+                    if (fileNameWithoutExt.endsWith("-master")) {
+                        doctorId = fileNameWithoutExt.replace("-master", "");
+                    } else {
+                        doctorId = fileNameWithoutExt;
+                    }
+
+                    // 의사번호 형식이 맞는지 확인하고, doctorlist.txt에 없으면 고아 파일
+                    if (doctorId.matches("^D\\d{5}$") && !referencedDoctorIds.contains(doctorId)) {
+                        orphanDoctorFiles.add("/data/doctor/" + fileName);
+                    }
+                });
         }
 
-        // 3. 고아 파일 검출 (파일은 존재하지만 list에 없음)
-        Set<String> orphanDoctorIds = new HashSet<>(existingDoctorIds);
-        orphanDoctorIds.removeAll(referencedDoctorIds);
-
-        if (!orphanDoctorIds.isEmpty()) {
-            String orphanFiles = orphanDoctorIds.stream()
+        // 3. 고아 파일 검출 결과 출력
+        if (!orphanDoctorFiles.isEmpty()) {
+            String orphanFiles = orphanDoctorFiles.stream()
                 .sorted()
-                .map(id -> "/data/doctor/" + id + ".txt")
                 .collect(Collectors.joining(", "));
 
             throw new OrphanDataException(
@@ -176,40 +183,10 @@ public class OrphanDataValidator {
     }
 
     private Set<String> collectReservationsFromDoctors() throws IOException {
-        Set<String> reservations = new HashSet<>();
-        List<String> doctorList = FileUtil.readLines("data/doctor/doctorlist.txt");
-
-        for (int i = 1; i < doctorList.size(); i++) {
-            String line = doctorList.get(i).trim();
-            if (line.isEmpty()) continue;
-
-            String[] parts = line.split("\\s+");
-            if (parts.length > 0) {
-                String doctorId = parts[0];
-                String doctorFile = "data/doctor/" + doctorId + ".txt";
-
-                if (FileUtil.resourceExists(doctorFile)) {
-                    List<String> doctorLines = FileUtil.readLines(doctorFile);
-
-                    // 4행부터 스케줄 (1행: 의사정보, 2행: 요일, 3행: 빈행)
-                    for (int j = 3; j < doctorLines.size(); j++) {
-                        String scheduleLine = doctorLines.get(j).trim();
-                        if (scheduleLine.isEmpty()) continue;
-
-                        String[] scheduleParts = scheduleLine.split("\\s+");
-                        // 첫 번째는 날짜, 나머지는 슬롯 (0 또는 예약번호)
-                        for (int k = 1; k < scheduleParts.length; k++) {
-                            String slot = scheduleParts[k];
-                            if (RESERVATION_ID_PATTERN.matcher(slot).matches()) {
-                                reservations.add(slot);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return reservations;
+        // 새로운 스케줄 형식에서는 의사 파일에 예약 ID가 없음
+        // 의사 파일은 이제 요일별 근무 시간만 저장 (예: MON 0900-1400)
+        // 따라서 빈 세트를 반환
+        return new HashSet<>();
     }
 
     private Set<String> collectReservationsFromAppointments() throws IOException {
@@ -256,41 +233,29 @@ public class OrphanDataValidator {
             Set<String> inDoctors,
             Set<String> inAppointments) {
 
-        // 환자 파일에만 있는 고아 예약
+        // 새로운 스케줄 형식에서는 의사 파일에 예약 ID가 없으므로
+        // 환자 파일과 예약 파일 간의 일관성만 검증
+
+        // 환자 파일에만 있는 고아 예약 (예약 파일에 없음)
         Set<String> orphanInPatients = new HashSet<>(inPatients);
-        orphanInPatients.removeAll(inDoctors);
         orphanInPatients.removeAll(inAppointments);
 
         if (!orphanInPatients.isEmpty()) {
             String orphans = orphanInPatients.stream().sorted().collect(Collectors.joining(", "));
             throw new OrphanDataException(
-                "[오류] 다음 예약이 환자 파일에만 존재하고 의사 스케줄이나 예약 파일에는 없습니다: "
+                "[오류] 다음 예약이 환자 파일에만 존재하고 예약 파일에는 없습니다: "
                 + orphans + " 프로그램을 종료합니다."
             );
         }
 
-        // 의사 파일에만 있는 고아 예약
-        Set<String> orphanInDoctors = new HashSet<>(inDoctors);
-        orphanInDoctors.removeAll(inPatients);
-        orphanInDoctors.removeAll(inAppointments);
-
-        if (!orphanInDoctors.isEmpty()) {
-            String orphans = orphanInDoctors.stream().sorted().collect(Collectors.joining(", "));
-            throw new OrphanDataException(
-                "[오류] 다음 예약이 의사 스케줄에만 존재하고 환자 파일이나 예약 파일에는 없습니다: "
-                + orphans + " 프로그램을 종료합니다."
-            );
-        }
-
-        // 예약 파일에만 있는 고아 예약
+        // 예약 파일에만 있는 고아 예약 (환자 파일에 없음)
         Set<String> orphanInAppointments = new HashSet<>(inAppointments);
         orphanInAppointments.removeAll(inPatients);
-        orphanInAppointments.removeAll(inDoctors);
 
         if (!orphanInAppointments.isEmpty()) {
             String orphans = orphanInAppointments.stream().sorted().collect(Collectors.joining(", "));
             throw new OrphanDataException(
-                "[오류] 다음 예약이 예약 파일에만 존재하고 환자 파일이나 의사 스케줄에는 없습니다: "
+                "[오류] 다음 예약이 예약 파일에만 존재하고 환자 파일에는 없습니다: "
                 + orphans + " 프로그램을 종료합니다."
             );
         }

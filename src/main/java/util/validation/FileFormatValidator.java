@@ -22,7 +22,8 @@ public class FileFormatValidator {
     private static final Pattern DATE_PATTERN = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}$");
     private static final Pattern TIME_PATTERN = Pattern.compile("^\\d{2}:\\d{2}$");
     private static final Pattern PHONE_PATTERN = Pattern.compile("^\\d{3}-\\d{4}-\\d{4}$");
-    private static final Pattern DEPARTMENT_PATTERN = Pattern.compile("^(IM|GS|OB|PED|PSY|DERM|ENT|ORTH)$");
+    private static final Pattern MAJOR_CODE_PATTERN = Pattern.compile("^[A-Z]{2,6}$");
+    private static final Pattern DAY_OF_WEEK_PATTERN = Pattern.compile("^(MON|TUE|WED|THU|FRI|SAT|SUN)$");
 
     public void validate() {
         System.out.print("파일 형식을 검증합니다...");
@@ -35,8 +36,10 @@ public class FileFormatValidator {
             validateCredentialsFile();
             validatePatientDetailFiles();
             validateDoctorDetailFiles();
-            validateAppointmentFiles();
             validateDoctorMajorCodeConsistency();
+            validateDoctorMasterScheduleFiles();
+            validateAppointmentFiles();
+            validateCredentialAccountTypeConsistency();
 
             System.out.println(" 성공");
         } catch (FileFormatException e) {
@@ -61,7 +64,7 @@ public class FileFormatValidator {
 
             // 헤더 검증
             String header = lines.get(0).trim();
-            if (!header.equals("[환자 번호] [아이디] [환자 이름] [생년월일] [전화번호]")) {
+            if (!header.equals("[환자 번호] [아이디] [환자 이름] [생년월일] [전화번호] [노쇼 횟수]")) {
                 throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
 
@@ -72,7 +75,7 @@ public class FileFormatValidator {
                     continue;
 
                 String[] parts = line.split("\\s+");
-                if (parts.length != 5) {
+                if (parts.length != 6) {
                     throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                 }
 
@@ -88,6 +91,11 @@ public class FileFormatValidator {
 
                 // 전화번호 형식 검증
                 if (!PHONE_PATTERN.matcher(parts[4]).matches()) {
+                    throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                }
+
+                // 노쇼 횟수 형식 검증 (정수)
+                if (!parts[5].matches("^\\d+$")) {
                     throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                 }
             }
@@ -107,7 +115,7 @@ public class FileFormatValidator {
 
             // 헤더 검증
             String header = lines.get(0).trim();
-            if (!header.equals("[의사번호] [의사이름] [진료과 코드]")) {
+            if (!header.equals("[의사번호] [의사이름] [진료과 코드] [전화번호] [등록일]")) {
                 throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
 
@@ -118,7 +126,7 @@ public class FileFormatValidator {
                     continue;
 
                 String[] parts = line.split("\\s+");
-                if (parts.length != 3) {
+                if (parts.length != 5) {
                     throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                 }
 
@@ -127,8 +135,13 @@ public class FileFormatValidator {
                     throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                 }
 
-                // 진료과 코드 형식 검증
-                if (!DEPARTMENT_PATTERN.matcher(parts[2]).matches()) {
+                // 전화번호 형식 검증
+                if (!PHONE_PATTERN.matcher(parts[3]).matches()) {
+                    throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                }
+
+                // 등록일 형식 검증
+                if (!DATE_PATTERN.matcher(parts[4]).matches()) {
                     throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                 }
             }
@@ -312,8 +325,8 @@ public class FileFormatValidator {
                     throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                 }
 
-                // 진료과 검증
-                if (!DEPARTMENT_PATTERN.matcher(parts[4]).matches()) {
+                // 진료과 검증 (형식만 확인, 실제 존재 여부는 validateDoctorMajorCodeConsistency에서 확인)
+                if (!MAJOR_CODE_PATTERN.matcher(parts[4]).matches()) {
                     throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                 }
 
@@ -361,66 +374,79 @@ public class FileFormatValidator {
 
     private void validateDoctorDetailFile(String doctorId) {
         String filePath = "data/doctor/" + doctorId + ".txt";
+        Pattern weekdayPattern = Pattern.compile("^(MON|TUE|WED|THU|FRI)$");
+        Pattern timeRangePattern = Pattern.compile("^\\d{4}-\\d{4}$");
+
         try {
             List<String> lines = FileUtil.readLines(filePath);
 
-            if (lines.size() < 3) {
-                throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+            if (lines.size() < 2) {
+                throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
 
-            // 1행: 의사 정보
+            // 1행: 의사 정보 (doctorlist.txt와 동일한 형식)
             String[] doctorInfo = lines.get(0).trim().split("\\s+");
-            if (doctorInfo.length != 3) {
-                throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+            if (doctorInfo.length != 5) {
+                throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
             if (!DOCTOR_ID_PATTERN.matcher(doctorInfo[0]).matches()) {
-                throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
-            if (!DEPARTMENT_PATTERN.matcher(doctorInfo[2]).matches()) {
-                throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+            if (!PHONE_PATTERN.matcher(doctorInfo[3]).matches()) {
+                throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
-
-            // 2행: 진료 가능 요일
-            String[] weekdays = lines.get(1).trim().split("\\s+");
-            if (weekdays.length != 5) {
-                throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
-            }
-            for (String day : weekdays) {
-                if (!day.equals("0") && !day.equals("1")) {
-                    throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
-                }
+            if (!DATE_PATTERN.matcher(doctorInfo[4]).matches()) {
+                throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
 
-            // 3행: 빈 행
-            if (!lines.get(2).trim().isEmpty()) {
-                throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+            // 2행: 빈 행
+            if (!lines.get(1).trim().isEmpty()) {
+                throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
 
-            // 4행부터: 스케줄 검증
-            for (int i = 3; i < lines.size(); i++) {
+            // 3행부터: 요일별 스케줄 (DAY HHMM-HHMM 형식)
+            for (int i = 2; i < lines.size(); i++) {
                 String line = lines.get(i).trim();
                 if (line.isEmpty())
                     continue;
 
                 String[] parts = line.split("\\s+");
-                if (parts.length != 55) { // 날짜 1개 + 슬롯 54개
-                    throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                if (parts.length != 2) {
+                    throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                 }
 
-                // 날짜 검증
-                if (!DATE_PATTERN.matcher(parts[0]).matches()) {
-                    throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                // 요일 검증 (MON, TUE, WED, THU, FRI)
+                if (!weekdayPattern.matcher(parts[0]).matches()) {
+                    throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                 }
 
-                // 슬롯 검증 (0 또는 예약번호)
-                for (int j = 1; j < parts.length; j++) {
-                    if (!parts[j].equals("0") && !RESERVATION_ID_PATTERN.matcher(parts[j]).matches()) {
-                        throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
-                    }
+                // 시간 범위 검증 (HHMM-HHMM)
+                if (!timeRangePattern.matcher(parts[1]).matches()) {
+                    throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                }
+
+                // 시간 값 유효성 검증 (0000-2359 범위)
+                String[] timeRange = parts[1].split("-");
+                if (timeRange.length != 2) {
+                    throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                }
+
+                int startTime = Integer.parseInt(timeRange[0]);
+                int endTime = Integer.parseInt(timeRange[1]);
+
+                if (startTime < 0 || startTime > 2359 || endTime < 0 || endTime > 2359) {
+                    throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                }
+
+                // 시작 시간이 종료 시간보다 이른지 검증
+                if (startTime >= endTime) {
+                    throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                 }
             }
         } catch (IOException e) {
-            throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+            throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+        } catch (NumberFormatException e) {
+            throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
         }
     }
 
@@ -473,7 +499,7 @@ public class FileFormatValidator {
 
     private void validateMajorListFile() {
         String filePath = "data/major/majorlist.txt";
-        Pattern majorCodePattern = Pattern.compile("^[A-Z]{2,4}$");
+        Pattern majorCodePattern = Pattern.compile("^[A-Z]{2,6}$");
 
         try {
             List<String> lines = FileUtil.readLines(filePath);
@@ -546,6 +572,188 @@ public class FileFormatValidator {
             }
         } catch (IOException e) {
             throw new FileFormatException("[오류] 진료과 코드 불일치 검증 중 오류가 발생했습니다. 프로그램을 종료합니다.");
+        }
+    }
+
+    private void validateDoctorMasterScheduleFiles() {
+        try {
+            List<String> doctorLines = FileUtil.readLines("data/doctor/doctorlist.txt");
+
+            for (int i = 1; i < doctorLines.size(); i++) {
+                String line = doctorLines.get(i).trim();
+                if (line.isEmpty()) continue;
+
+                String[] parts = line.split("\\s+");
+                if (parts.length > 0) {
+                    String doctorId = parts[0];
+                    String masterFilePath = "data/doctor/" + doctorId + "-master.txt";
+
+                    // Check if master file exists
+                    if (!FileUtil.resourceExists(masterFilePath)) {
+                        continue; // Master file is optional
+                    }
+
+                    // Validate master file format
+                    validateDoctorMasterScheduleFile(doctorId);
+                }
+            }
+        } catch (IOException e) {
+            throw new FileFormatException("[오류] 의사 마스터 스케줄 파일 검증 중 오류가 발생했습니다. 프로그램을 종료합니다.");
+        }
+    }
+
+    private void validateDoctorMasterScheduleFile(String doctorId) {
+        String filePath = "data/doctor/" + doctorId + "-master.txt";
+
+        try {
+            List<String> lines = FileUtil.readLines(filePath);
+
+            if (lines.isEmpty()) {
+                throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+            }
+
+            // Expected format: 7 lines (MON to SUN)
+            String[] expectedDays = {"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"};
+            int dayIndex = 0;
+            int validLineCount = 0;
+
+            for (String line : lines) {
+                String trimmed = line.trim();
+
+                // Skip empty lines
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+
+                validLineCount++;
+
+                String[] parts = trimmed.split("\\s+");
+
+                // Must be exactly 3 parts: [DAY] [START_TIME] [END_TIME]
+                if (parts.length != 3) {
+                    throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                }
+
+                String day = parts[0];
+                String startTime = parts[1];
+                String endTime = parts[2];
+
+                // Validate day of week
+                if (!DAY_OF_WEEK_PATTERN.matcher(day).matches()) {
+                    throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                }
+
+                // Check if "0 0" (no schedule for this day)
+                if (startTime.equals("0") && endTime.equals("0")) {
+                    continue;
+                }
+
+                // Validate time format (HH:MM)
+                if (!TIME_PATTERN.matcher(startTime).matches() || !TIME_PATTERN.matcher(endTime).matches()) {
+                    throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                }
+
+                // Validate time values
+                String[] startParts = startTime.split(":");
+                String[] endParts = endTime.split(":");
+
+                int startHour = Integer.parseInt(startParts[0]);
+                int startMinute = Integer.parseInt(startParts[1]);
+                int endHour = Integer.parseInt(endParts[0]);
+                int endMinute = Integer.parseInt(endParts[1]);
+
+                if (startHour < 0 || startHour > 23 || startMinute < 0 || startMinute > 59 ||
+                    endHour < 0 || endHour > 23 || endMinute < 0 || endMinute > 59) {
+                    throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                }
+
+                // Start time must be before end time
+                int startTotalMinutes = startHour * 60 + startMinute;
+                int endTotalMinutes = endHour * 60 + endMinute;
+
+                if (startTotalMinutes >= endTotalMinutes) {
+                    throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                }
+            }
+
+            // Must have exactly 7 valid lines (one for each day of week)
+            if (validLineCount != 7) {
+                throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+            }
+
+        } catch (IOException e) {
+            throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+        } catch (NumberFormatException e) {
+            throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+        }
+    }
+
+    private void validateCredentialAccountTypeConsistency() {
+        try {
+            // patientlist.txt에서 환자 ID 목록 읽기
+            List<String> patientLines = FileUtil.readLines("data/patient/patientlist.txt");
+            java.util.Set<String> patientIds = new java.util.HashSet<>();
+            java.util.Map<String, String> patientIdToUsername = new java.util.HashMap<>();
+
+            for (int i = 1; i < patientLines.size(); i++) {
+                String line = patientLines.get(i).trim();
+                if (line.isEmpty()) continue;
+
+                String[] parts = line.split("\\s+");
+                if (parts.length >= 2) {
+                    patientIds.add(parts[0]); // 환자번호
+                    patientIdToUsername.put(parts[0], parts[1]); // 환자번호 -> 아이디
+                }
+            }
+
+            // doctorlist.txt에서 의사 ID 목록 읽기
+            List<String> doctorLines = FileUtil.readLines("data/doctor/doctorlist.txt");
+            java.util.Set<String> doctorIds = new java.util.HashSet<>();
+            java.util.Map<String, String> doctorIdToUsername = new java.util.HashMap<>();
+
+            for (int i = 1; i < doctorLines.size(); i++) {
+                String line = doctorLines.get(i).trim();
+                if (line.isEmpty()) continue;
+
+                String[] parts = line.split("\\s+");
+                if (parts.length >= 1) {
+                    doctorIds.add(parts[0]); // 의사번호
+                }
+            }
+
+            // credentials.txt에서 계정 정보 읽기 및 검증
+            List<String> credentialLines = FileUtil.readLines("data/auth/credentials.txt");
+
+            for (int i = 1; i < credentialLines.size(); i++) {
+                String line = credentialLines.get(i).trim();
+                if (line.isEmpty()) continue;
+
+                String[] parts = line.split("\\s+");
+                if (parts.length >= 4) {
+                    String username = parts[0];
+                    String accountType = parts[2];
+                    String identifier = parts[3];
+
+                    // PATIENT 타입인데 환자 목록에 없는 경우
+                    if (accountType.equals("PATIENT")) {
+                        if (!patientIds.contains(identifier)) {
+                            throw new FileFormatException(
+                                "[오류] 계정 타입 불일치: " + username + "은 PATIENT로 등록되어 있으나 환자 목록에 존재하지 않습니다. 프로그램을 종료합니다."
+                            );
+                        }
+                    }
+                    // DOCTOR 타입인데 의사 목록에 없는 경우
+                    else if (accountType.equals("DOCTOR")) {
+                        if (!doctorIds.contains(identifier)) {
+                            throw new FileFormatException(
+                                "[오류] 계정 타입 불일치: " + username + "은 DOCTOR로 등록되어 있으나 의사 목록에 존재하지 않습니다. 프로그램을 종료합니다."
+                            );
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            throw new FileFormatException("[오류] 계정 타입 불일치 검증 중 오류가 발생했습니다. 프로그램을 종료합니다.");
         }
     }
 }
