@@ -12,6 +12,7 @@ import java.util.Map;
 
 import util.exception.SearchException;
 import util.file.FileUtil;
+import repository.MajorRepository;
 
 /**
  * 관리자 기능 (6.4)
@@ -21,6 +22,11 @@ import util.file.FileUtil;
  * 파일 포맷은 기획서 규격을 따른다.
  */
 public class AdminService {
+    private final MajorRepository majorRepository;
+
+    public AdminService(MajorRepository majorRepository) {
+        this.majorRepository = majorRepository;
+    }
 
     // ========== 6.4.1 회원 검색 ==========
     public void searchUser(String[] args) throws SearchException {
@@ -100,9 +106,9 @@ public class AdminService {
                     String docNo = a[5];
                     String status = statusText(a[6]);
                     String docName = lookupDoctorName(docNo);
-                    String deptName = deptKorean(dept);
-                    System.out.printf("- %s | %s | %s-%s | %s | %s | [%s]%n",
-                            rno, date, st, en, deptName, (docName == null ? docNo : docName), status);
+                    String deptName = majorRepository.findByCode(dept).map(model.Major::getMajorName).orElse(dept);
+                    System.out.printf("- %s | %s | %s-%s | %s | %s | [%s]%n", rno, date, st, en, deptName,
+                            (docName == null ? docNo : docName), status);
                 }
             }
         } catch (IOException e) {
@@ -164,12 +170,13 @@ public class AdminService {
                     String docNo = doctorNos.get(i);
                     String docName = doctorNameMap.getOrDefault(docNo, docNo);
                     String deptCode = doctorDeptMap.getOrDefault(docNo, "");
-                    String deptName = deptKorean(deptCode);
+                    String deptName = majorRepository.findByCode(deptCode).map(model.Major::getMajorName)
+                            .orElse(deptCode);
                     String userId = findUserIdByReservation(rno);
                     String timeEnd = plus10(time);
 
-                    out.add(String.format("%s | %s-%s | %s | %s | %s | [예약중]",
-                            rno, time, timeEnd, deptName, docName, (userId == null ? "-" : userId)));
+                    out.add(String.format("%s | %s-%s | %s | %s | %s | [예약중]", rno, time, timeEnd, deptName, docName,
+                            (userId == null ? "-" : userId)));
                 }
             }
 
@@ -198,20 +205,6 @@ public class AdminService {
             case "3" -> "취소";
             case "4" -> "미방문";
             default -> "알수없음";
-        };
-    }
-
-    private String deptKorean(String code) {
-        return switch (code) {
-            case "IM" -> "내과";
-            case "GS" -> "일반외과";
-            case "OB" -> "산부인과";
-            case "PED" -> "소아과";
-            case "PSY" -> "정신과";
-            case "DERM" -> "피부과";
-            case "ENT" -> "이비인후과";
-            case "ORTH" -> "정형외과";
-            default -> code;
         };
     }
 

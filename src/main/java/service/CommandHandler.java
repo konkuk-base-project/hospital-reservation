@@ -37,6 +37,9 @@ import service.search.DoctorCommand;
 import service.search.MyListCommand;
 import service.search.SearchService;
 
+import repository.MajorRepository;
+import service.admin.AddMajorCommand;
+
 public class CommandHandler {
     private final AuthContext authContext;
     private final Map<String, Command> commands;
@@ -45,14 +48,16 @@ public class CommandHandler {
 
     public CommandHandler() {
         this.authContext = new AuthContext();
+        MajorRepository majorRepository = new MajorRepository();
+
         PatientRepository patientRepository = new PatientRepository();
         DoctorRepository doctorRepository = new DoctorRepository(); // 추가
         AuthRepository authRepository = new AuthRepository();
         AuthService authService = new AuthService(patientRepository, doctorRepository, authRepository, authContext); // 수정
 
-        SearchService searchService = new SearchService(authContext);
+        SearchService searchService = new SearchService(authContext, majorRepository);
         ReservationService reservationService = new ReservationService(authContext);
-        AdminService adminService = new AdminService();
+        AdminService adminService = new AdminService(majorRepository);
         DoctorService doctorService = new DoctorService(authContext); // 추가
 
         this.commands = new HashMap<>();
@@ -78,6 +83,7 @@ public class CommandHandler {
         // 관리자 명령어
         commands.put("user", new UserSearchCommand(adminService));
         commands.put("reserve-list", new ReserveListCommand(adminService));
+        commands.put("add-major", new AddMajorCommand(majorRepository, authContext)); // 추가
 
         // 의사 명령어 (추가)
         commands.put("set-schedule", new SetScheduleCommand(doctorService));
