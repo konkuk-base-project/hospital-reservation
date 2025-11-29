@@ -7,7 +7,6 @@ public class Doctor {
     private final String deptCode;
     private final String phoneNumber;
     private final String registrationDate;
-
     public Doctor(String doctorId, String username, String name, String deptCode, String phoneNumber,  String registrationDate) {
         this.doctorId = doctorId;
         this.username = username;
@@ -37,11 +36,15 @@ public class Doctor {
         return phoneNumber;
     }
 
+    public String getRegistrationDate() {
+        return registrationDate;
+    }
+
     public String toDoctorListString() {
         return String.join(" ", doctorId, name, deptCode, phoneNumber, registrationDate);
     }
 
     public String toDetailFileHeaderString() {
-        return String.join(" ", doctorId, name, deptCode);
+        return String.join(" ", doctorId, name, deptCode, phoneNumber, registrationDate);
     }
 }
