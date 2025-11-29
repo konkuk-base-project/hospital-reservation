@@ -183,10 +183,40 @@ public class OrphanDataValidator {
     }
 
     private Set<String> collectReservationsFromDoctors() throws IOException {
-        // 새로운 스케줄 형식에서는 의사 파일에 예약 ID가 없음
-        // 의사 파일은 이제 요일별 근무 시간만 저장 (예: MON 0900-1400)
-        // 따라서 빈 세트를 반환
-        return new HashSet<>();
+        Set<String> reservations = new HashSet<>();
+        List<String> doctorList = FileUtil.readLines("data/doctor/doctorlist.txt");
+
+        for (int i = 1; i < doctorList.size(); i++) {
+            String line = doctorList.get(i).trim();
+            if (line.isEmpty()) continue;
+
+            String[] parts = line.split("\\s+");
+            if (parts.length > 0) {
+                String doctorId = parts[0];
+                String doctorFile = "data/doctor/" + doctorId + ".txt";
+
+                if (FileUtil.resourceExists(doctorFile)) {
+                    List<String> doctorLines = FileUtil.readLines(doctorFile);
+
+                    // 4행부터 날짜별 예약 정보 (1행: 의사정보, 2행: 요일별 진료여부, 3행: 빈행)
+                    for (int j = 3; j < doctorLines.size(); j++) {
+                        String schedLine = doctorLines.get(j).trim();
+                        if (schedLine.isEmpty()) continue;
+
+                        String[] schedParts = schedLine.split("\\s+");
+                        // 첫 번째는 날짜, 나머지 54개는 슬롯 (0 또는 R00000001 형식)
+                        for (int k = 1; k < schedParts.length; k++) {
+                            String slot = schedParts[k];
+                            if (RESERVATION_ID_PATTERN.matcher(slot).matches()) {
+                                reservations.add(slot);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return reservations;
     }
 
     private Set<String> collectReservationsFromAppointments() throws IOException {
@@ -214,8 +244,13 @@ public class OrphanDataValidator {
                              // 첫 번째는 시간, 나머지는 의사별 슬롯
                              for (int j = 1; j < parts.length; j++) {
                                  String slot = parts[j];
-                                 if (RESERVATION_ID_PATTERN.matcher(slot).matches()) {
-                                     reservations.add(slot);
+                                 // R00000001(1) 형식에서 예약 ID만 추출
+                                 String reservationId = slot;
+                                 if (slot.contains("(")) {
+                                     reservationId = slot.substring(0, slot.indexOf('('));
+                                 }
+                                 if (RESERVATION_ID_PATTERN.matcher(reservationId).matches()) {
+                                     reservations.add(reservationId);
                                  }
                              }
                          }
@@ -233,29 +268,42 @@ public class OrphanDataValidator {
             Set<String> inDoctors,
             Set<String> inAppointments) {
 
-        // 새로운 스케줄 형식에서는 의사 파일에 예약 ID가 없으므로
-        // 환자 파일과 예약 파일 간의 일관성만 검증
-
-        // 환자 파일에만 있는 고아 예약 (예약 파일에 없음)
+        // 세 곳 모두에서 일관되게 존재해야 함
+        // 1. 환자 파일에만 있는 고아 예약
         Set<String> orphanInPatients = new HashSet<>(inPatients);
+        orphanInPatients.removeAll(inDoctors);
         orphanInPatients.removeAll(inAppointments);
 
         if (!orphanInPatients.isEmpty()) {
             String orphans = orphanInPatients.stream().sorted().collect(Collectors.joining(", "));
             throw new OrphanDataException(
-                "[오류] 다음 예약이 환자 파일에만 존재하고 예약 파일에는 없습니다: "
+                "[오류] 다음 예약이 환자 파일에만 존재합니다: "
                 + orphans + " 프로그램을 종료합니다."
             );
         }
 
-        // 예약 파일에만 있는 고아 예약 (환자 파일에 없음)
+        // 2. 의사 파일에만 있는 고아 예약
+        Set<String> orphanInDoctors = new HashSet<>(inDoctors);
+        orphanInDoctors.removeAll(inPatients);
+        orphanInDoctors.removeAll(inAppointments);
+
+        if (!orphanInDoctors.isEmpty()) {
+            String orphans = orphanInDoctors.stream().sorted().collect(Collectors.joining(", "));
+            throw new OrphanDataException(
+                "[오류] 다음 예약이 의사 파일에만 존재합니다: "
+                + orphans + " 프로그램을 종료합니다."
+            );
+        }
+
+        // 3. 예약 파일에만 있는 고아 예약
         Set<String> orphanInAppointments = new HashSet<>(inAppointments);
         orphanInAppointments.removeAll(inPatients);
+        orphanInAppointments.removeAll(inDoctors);
 
         if (!orphanInAppointments.isEmpty()) {
             String orphans = orphanInAppointments.stream().sorted().collect(Collectors.joining(", "));
             throw new OrphanDataException(
-                "[오류] 다음 예약이 예약 파일에만 존재하고 환자 파일에는 없습니다: "
+                "[오류] 다음 예약이 예약 파일에만 존재합니다: "
                 + orphans + " 프로그램을 종료합니다."
             );
         }

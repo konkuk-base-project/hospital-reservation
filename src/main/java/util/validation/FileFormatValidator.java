@@ -374,13 +374,11 @@ public class FileFormatValidator {
 
     private void validateDoctorDetailFile(String doctorId) {
         String filePath = "data/doctor/" + doctorId + ".txt";
-        Pattern weekdayPattern = Pattern.compile("^(MON|TUE|WED|THU|FRI)$");
-        Pattern timeRangePattern = Pattern.compile("^\\d{4}-\\d{4}$");
 
         try {
             List<String> lines = FileUtil.readLines(filePath);
 
-            if (lines.size() < 2) {
+            if (lines.size() < 3) {
                 throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
 
@@ -399,48 +397,43 @@ public class FileFormatValidator {
                 throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
 
-            // 2행: 빈 행
-            if (!lines.get(1).trim().isEmpty()) {
+            // 2행: 요일별 진료 여부 (5개 값: 월화수목금)
+            String[] weekdaySchedule = lines.get(1).trim().split("\\s+");
+            if (weekdaySchedule.length != 5) {
+                throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+            }
+            for (String day : weekdaySchedule) {
+                if (!day.matches("^[01]$")) {
+                    throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                }
+            }
+
+            // 3행: 빈 행
+            if (!lines.get(2).trim().isEmpty()) {
                 throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
 
-            // 3행부터: 요일별 스케줄 (DAY HHMM-HHMM 형식)
-            for (int i = 2; i < lines.size(); i++) {
+            // 4행부터: 날짜별 예약 정보 (날짜 + 54개 슬롯)
+            for (int i = 3; i < lines.size(); i++) {
                 String line = lines.get(i).trim();
                 if (line.isEmpty())
                     continue;
 
                 String[] parts = line.split("\\s+");
-                if (parts.length != 2) {
+                if (parts.length != 55) {
                     throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                 }
 
-                // 요일 검증 (MON, TUE, WED, THU, FRI)
-                if (!weekdayPattern.matcher(parts[0]).matches()) {
+                // 날짜 형식 검증
+                if (!DATE_PATTERN.matcher(parts[0]).matches()) {
                     throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                 }
 
-                // 시간 범위 검증 (HHMM-HHMM)
-                if (!timeRangePattern.matcher(parts[1]).matches()) {
-                    throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
-                }
-
-                // 시간 값 유효성 검증 (0000-2359 범위)
-                String[] timeRange = parts[1].split("-");
-                if (timeRange.length != 2) {
-                    throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
-                }
-
-                int startTime = Integer.parseInt(timeRange[0]);
-                int endTime = Integer.parseInt(timeRange[1]);
-
-                if (startTime < 0 || startTime > 2359 || endTime < 0 || endTime > 2359) {
-                    throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
-                }
-
-                // 시작 시간이 종료 시간보다 이른지 검증
-                if (startTime >= endTime) {
-                    throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                // 슬롯 값 검증 (0 또는 R로 시작하는 예약번호)
+                for (int j = 1; j < parts.length; j++) {
+                    if (!parts[j].equals("0") && !RESERVATION_ID_PATTERN.matcher(parts[j]).matches()) {
+                        throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                    }
                 }
             }
         } catch (IOException e) {
