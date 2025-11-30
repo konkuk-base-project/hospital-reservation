@@ -1,6 +1,5 @@
 package service;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -8,12 +7,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 
-import repository.AppointmentRepository;
 import repository.AuthRepository;
 import repository.DoctorRepository;
-import repository.MajorRepository;
 import repository.PatientRepository;
-import service.admin.AddMajorCommand;
 import service.admin.AdminService;
 import service.admin.ReserveListCommand;
 import service.admin.UserSearchCommand;
@@ -42,6 +38,11 @@ import service.search.DoctorCommand;
 import service.search.MyListCommand;
 import service.search.SearchService;
 
+import repository.MajorRepository;
+import service.admin.AddMajorCommand;
+
+import repository.AppointmentRepository;
+
 public class CommandHandler {
     private final AuthContext authContext;
     private final Map<String, Command> commands;
@@ -62,7 +63,7 @@ public class CommandHandler {
         SearchService searchService = new SearchService(authContext, majorRepository);
         ReservationService reservationService = new ReservationService(authContext);
         AdminService adminService = new AdminService(majorRepository);
-        DoctorService doctorService = new DoctorService(authContext);
+        DoctorService doctorService = new DoctorService(authContext,appointmentRepository);
 
         this.commands = new HashMap<>();
 
@@ -104,14 +105,9 @@ public class CommandHandler {
 
         // 가상시간
         commands.put("time", args -> {
-            if (args.length > 0) {
-                System.out.println("[오류] 인자가 없어야 합니다.");
-                return;
-            }
-    
-        LocalDateTime now = util.file.VirtualTime.currentDateTime();
-        System.out.println("현재 가상 시간: " + now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
-    });
+            LocalDateTime now = util.file.VirtualTime.currentDateTime();
+            System.out.println("[현재 가상 시간] " + now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+        });
 
         // 가상시간 설정
         commands.put("settime", args -> handleSetTime(args));
@@ -192,7 +188,7 @@ public class CommandHandler {
     // settime 명령어 처리
     // ===========================
     private void handleSetTime(String[] args) {
-        if (args.length != 2) {
+        if (args.length < 2) {
             System.out.println("[오류] 인자의 개수가 올바르지 않습니다. (형식: settime <날짜 YYYY-MM-DD> <시간 HH:MM>)");
             return;
         }
@@ -200,62 +196,60 @@ public class CommandHandler {
         String dateStr = args[0];
         String timeStr = args[1];
 
-        boolean hasError = false;
+        // 기본 형식 체크
+        if (!timeStr.matches("^\\d{2}:\\d{2}$")) {
+            System.out.println("[오류] 시간 형식이 잘못되었습니다. (예: 14:30, 00:00~23:59)");
+            return;
+        }
+
+        String[] timeParts = timeStr.split(":");
+        int HH = Integer.parseInt(timeParts[0]);
+        int MM = Integer.parseInt(timeParts[1]);
+
+        // 24:00 방지
+        if (HH < 0 || HH > 23 || MM < 0 || MM > 59) {
+            System.out.println("[오류] 시간 형식이 잘못되었습니다. (예: 14:30, 00:00~23:59)");
+            return;
+        }
 
         // 날짜 형식 검증
         if (!dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$")) {
             System.out.println("[오류] 날짜 형식이 잘못되었습니다. (예: 2025-10-10)");
-            hasError = true;
-        } else {
-            try {
-                LocalDate.parse(dateStr);
-            } catch (Exception e) {
-                System.out.println("[오류] 날짜 형식이 잘못되었습니다. (예: 2025-10-10)");
-                hasError = true;
-            }
+            return;
         }
 
-        // 시간 형식 검증
-        if (!timeStr.matches("^\\d{2}:\\d{2}$")) {
-            System.out.println("[오류] 시간 형식이 잘못되었습니다. (예: 14:30, 00:00~23:59)");
-            hasError = true;
-        } else {
-            String[] timeParts = timeStr.split(":");
-            int HH = Integer.parseInt(timeParts[0]);
-            int MM = Integer.parseInt(timeParts[1]);
-
-            if (HH < 0 || HH > 23 || MM < 0 || MM > 59) {
-                System.out.println("[오류] 시간 형식이 잘못되었습니다. (예: 14:30, 00:00~23:59)");
-                hasError = true;
-            }
-        }
-
-        // 날짜/시간 둘 중 하나라도 잘못되면 종료
-        if (hasError) return;
-
-        // ===== 정상일 때만 여기로 내려옴 =====
-        LocalDateTime newTime;
+        // 초 자동 추가
         String full = dateStr + " " + timeStr + ":00";
 
         try {
-            newTime = LocalDateTime.parse(full,
+            LocalDateTime newTime = LocalDateTime.parse(full,
                     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        } catch (Exception e) {
-                System.out.println("[오류] 시간 형식이 잘못되었습니다. (예: 14:30, 00:00~23:59)");
-                return;
-        }
 
-        LocalDateTime min = LocalDateTime.of(2025, 1, 1, 0, 0, 0);
-        LocalDateTime max = LocalDateTime.of(2025, 12, 31, 23, 59, 59);
+            // 현재 가상시간
+            LocalDateTime now = util.file.VirtualTime.currentDateTime();
 
-        if (newTime.isBefore(min) || newTime.isAfter(max)) {
-                System.out.println("[오류] 설정 가능한 시간 범위를 벗어났습니다. (2025-01-01 ~ 2025-12-31)");
+            // 설정 범위: 현재 이후 ~ 2025-12-31
+            LocalDateTime max = LocalDateTime.of(2025, 12, 31, 23, 59);
+
+            if (newTime.isBefore(now)) {
+                System.out.println("[오류] 과거 시간으로 되돌릴 수 없습니다. (현재: " +
+                        now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + ")");
                 return;
             }
 
-        util.file.VirtualTime.setTime(newTime);
+            if (newTime.isAfter(max)) {
+                System.out.println("[오류] 설정 가능한 시간 범위를 벗어났습니다. (현재 시간 이후 ~ 2025-12-31)");
+                return;
+            }
 
-        System.out.println("가상 시간이 설정되었습니다.");
-        System.out.println("현재 가상 시간: " + newTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+            util.file.VirtualTime.setTime(newTime);
+
+            System.out.println("가상 시간이 설정되었습니다.");
+            System.out.println("현재 가상 시간: " + newTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+
+        } catch (Exception e) {
+            System.out.println("[오류] 시간 형식이 잘못되었습니다. (예: 14:30, 00:00~23:59)");
+        }
     }
+
 }
