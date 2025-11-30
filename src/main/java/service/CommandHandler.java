@@ -110,7 +110,7 @@ public class CommandHandler {
             }
     
         LocalDateTime now = util.file.VirtualTime.currentDateTime();
-        System.out.println("[현재 가상 시간] " + now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+        System.out.println("현재 가상 시간: " + now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
     });
 
         // 가상시간 설정
