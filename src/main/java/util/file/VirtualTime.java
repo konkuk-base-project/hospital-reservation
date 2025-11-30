@@ -81,11 +81,11 @@ public class VirtualTime {
     public static void setTime(LocalDateTime newTime) {
         // 범위 검증
         if (newTime.isBefore(MIN_TIME)) {
-            System.out.println("[오류] 설정 가능한 최소 날짜는 2025-01-01 입니다.");
+            System.out.println("[오류] 설정 가능한 시간 범위를 벗어났습니다. (2025-01-01 ~ 2025-12-31)");
             return;
         }
         if (newTime.isAfter(MAX_TIME)) {
-            System.out.println("[오류] 설정 가능한 최대 날짜는 2025-12-31 23:59:59 입니다.");
+            System.out.println("[오류] 설정 가능한 시간 범위를 벗어났습니다. (2025-01-01 ~ 2025-12-31)");
             return;
         }
 
