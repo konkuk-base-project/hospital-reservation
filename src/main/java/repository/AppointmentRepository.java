@@ -258,6 +258,41 @@ public class AppointmentRepository {
     }
 
     /**
+     * 예약 상태를 업데이트합니다 (진료완료, 노쇼 등)
+     *
+     * @param date          예약 날짜
+     * @param reservationId 예약 번호
+     * @param newStatus     새로운 상태 코드 (2: 진료완료, 4: 노쇼)
+     * @throws AppointmentFileException 파일 처리 중 오류 발생 시
+     */
+    public void updateAppointmentStatus(LocalDate date, String reservationId, String newStatus)
+            throws AppointmentFileException {
+        AppointmentData data = getAppointmentsByDate(date);
+
+        boolean found = false;
+        for (TimeSlot slot : data.timeSlots) {
+            for (int i = 0; i < slot.statuses.length; i++) {
+                // 예약번호만 비교 (상태코드 제외)
+                if (slot.statuses[i].startsWith(reservationId + "(")) {
+                    slot.statuses[i] = reservationId + "(" + newStatus + ")";
+                    found = true;
+                    break;
+                }
+            }
+            if (found)
+                break;
+        }
+
+        if (!found) {
+            throw new AppointmentFileException(
+                    AppointmentFileException.ErrorType.INVALID_APPOINTMENT_STATUS,
+                    "예약 번호 " + reservationId + "를 찾을 수 없습니다");
+        }
+
+        saveAppointmentData(date, data);
+    }
+
+    /**
      * 예약 파일 경로를 생성합니다
      */
     private Path getAppointmentFilePath(LocalDate date) {

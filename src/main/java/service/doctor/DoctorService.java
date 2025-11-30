@@ -5,6 +5,7 @@ import service.AuthContext;
 import service.doctor.helper.PatientFileReader;
 import util.exception.DoctorScheduleException;
 import util.file.FileUtil;
+import repository.AppointmentRepository;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,6 +19,7 @@ import java.util.regex.Pattern;
 
 public class DoctorService {
     private final AuthContext authContext;
+    private final AppointmentRepository appointmentRepository;
     private static final Pattern TIME_PATTERN = Pattern.compile("^\\d{2}:\\d{2}$");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -31,8 +33,9 @@ public class DoctorService {
             "FRI", "금요일", "SAT", "토요일", "SUN", "일요일"
     );
 
-    public DoctorService(AuthContext authContext) {
+    public DoctorService(AuthContext authContext, AppointmentRepository appointmentRepository) {
         this.authContext = authContext;
+        this.appointmentRepository = appointmentRepository;
     }
 
     /**
@@ -97,6 +100,21 @@ public class DoctorService {
             if (updated) {
                 Path masterFile = FileUtil.getResourcePath(masterFilePath);
                 Files.write(masterFile, lines);
+
+                // {doctorId}.txt 파일의 요일별 근무 여부도 업데이트
+                String doctorFilePath = "data/doctor/" + doctorId + ".txt";
+                List<String> doctorLines = FileUtil.readLines(doctorFilePath);
+
+                if (doctorLines.size() >= 2) {
+                    String[] weekdaySchedule = doctorLines.get(1).split("\\s+");
+                    if (weekdaySchedule.length == 5 && dayIndex >= 0 && dayIndex < 5) {
+                        weekdaySchedule[dayIndex] = "1";  // 해당 요일 근무 가능으로 설정
+                        doctorLines.set(1, String.join(" ", weekdaySchedule));
+
+                        Path doctorFile = FileUtil.getResourcePath(doctorFilePath);
+                        Files.write(doctorFile, doctorLines);
+                    }
+                }
 
                 if (alreadyExists) {
                     System.out.println("[경고] 진료 일정이 이미 존재합니다.");
@@ -434,6 +452,13 @@ public class DoctorService {
             // 환자 파일 업데이트 (상태 1 -> 2)
             updatePatientReservationStatus(resInfo.patientId, reservationId, "2");
 
+            // Appointment 파일도 업데이트
+            try {
+                appointmentRepository.updateAppointmentStatus(resDate, reservationId, "2");
+            } catch (util.exception.AppointmentFileException e) {
+                throw new DoctorScheduleException("예약 상태 업데이트 중 오류가 발생했습니다: " + e.getMessage());
+            }
+
             System.out.println("예약이 진료완료 처리되었습니다.");
             System.out.println("- 예약번호: " + reservationId);
             System.out.println("- 환자: " + resInfo.patientName + " (" + resInfo.patientId + ")");
@@ -498,6 +523,13 @@ public class DoctorService {
 
             // 환자 파일 업데이트 (상태 1 -> 4)
             updatePatientReservationStatus(resInfo.patientId, reservationId, "4");
+
+            // Appointment 파일도 업데이트
+            try {
+                appointmentRepository.updateAppointmentStatus(resDate, reservationId, "4");
+            } catch (util.exception.AppointmentFileException e) {
+                throw new DoctorScheduleException("예약 상태 업데이트 중 오류가 발생했습니다: " + e.getMessage());
+            }
 
             // 노쇼 횟수 증가
             int noshowCount = incrementNoshowCount(resInfo.patientId);
