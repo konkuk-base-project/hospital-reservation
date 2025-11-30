@@ -279,9 +279,9 @@ public class FileFormatValidator {
                 throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
 
-            // 1행: 환자 기본 정보
+            // 1행: 환자 기본 정보 (환자번호 이름 생년월일 전화번호 노쇼횟수)
             String[] basicInfo = lines.get(0).trim().split("\\s+");
-            if (basicInfo.length != 4) {
+            if (basicInfo.length != 5) {
                 throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
             if (!PATIENT_ID_PATTERN.matcher(basicInfo[0]).matches()) {
@@ -291,6 +291,10 @@ public class FileFormatValidator {
                 throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
             if (!PHONE_PATTERN.matcher(basicInfo[3]).matches()) {
+                throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+            }
+            // 노쇼 횟수 형식 검증 (음이 아닌 정수)
+            if (!basicInfo[4].matches("^\\d+$")) {
                 throw new FileFormatException("[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
             }
 
