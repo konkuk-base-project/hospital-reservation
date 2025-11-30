@@ -60,9 +60,9 @@ public class VirtualTime {
 
     static { load(); }
 
-    // 2) 기본 BASE_TIME → 2025-01-01 09:00:00 로 변경
+    // 2) 기본 BASE_TIME → 2025-10-01 09:00:00 로 변경
     private static void initDefaultBaseTime() {
-        baseTime = LocalDateTime.of(2025, 1, 1, 9, 0, 0);
+        baseTime = LocalDateTime.of(2025, 10, 1, 9, 0, 0);
 
         String line = "BASE_TIME=" + FORMATTER.format(baseTime);
         FileUtil.writeLines(FILE_PATH, List.of(line));
