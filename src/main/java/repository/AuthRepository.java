@@ -1,6 +1,7 @@
 package repository;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +22,8 @@ public class AuthRepository {
             List<String> lines = FileUtil.readLines(CREDENTIALS_FILE_PATH);
             for (int i = 1; i < lines.size(); i++) {
                 String line = lines.get(i);
-                if (line.trim().isEmpty()) continue;
+                if (line.trim().isEmpty())
+                    continue;
                 String[] parts = line.split("\\s+");
                 if (parts.length == 4) {
                     User user = new User(parts[0], parts[1], parts[2], parts[3]);
@@ -41,5 +43,16 @@ public class AuthRepository {
     public void save(User user) throws IOException {
         FileUtil.appendLine(CREDENTIALS_FILE_PATH, user.toFileString());
         users.put(user.getUsername(), user);
+    }
+
+    public void delete(String username) throws IOException {
+        users.remove(username);
+        List<String> lines = new ArrayList<>();
+        lines.add(FileUtil.readLines(CREDENTIALS_FILE_PATH).get(0));
+        lines.add("");
+        for (User user : users.values()) {
+            lines.add(user.toFileString());
+        }
+        FileUtil.writeLines(CREDENTIALS_FILE_PATH, lines);
     }
 }
