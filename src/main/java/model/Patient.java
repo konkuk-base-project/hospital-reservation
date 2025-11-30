@@ -6,6 +6,7 @@ public class Patient {
     private final String name;
     private final String birthDate;
     private final String phoneNumber;
+    private int noshowCount = 0;
 
     public Patient(String patientId, String username, String name, String birthDate, String phoneNumber) {
         this.patientId = patientId;
@@ -15,10 +16,20 @@ public class Patient {
         this.phoneNumber = phoneNumber;
     }
 
-    public String getPatientId() { return patientId; }
+    public void setNoshowCount(int noshowCount) {
+        this.noshowCount = noshowCount;
+    }
+
+    public int getNoshowCount() {
+        return noshowCount;
+    }
+
+    public String getPatientId() {
+        return patientId;
+    }
 
     public String toPatientListString() {
-        return String.join(" ", patientId, username, name, birthDate, phoneNumber);
+        return String.join(" ", patientId, username, name, birthDate, phoneNumber, String.valueOf(noshowCount));
     }
 
     public String toDetailFileHeaderString() {

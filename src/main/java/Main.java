@@ -13,7 +13,8 @@ public class Main {
         FileExistValidator fileExistValidator = new FileExistValidator();
         fileExistValidator.validate();
 
-        FileFormatValidator fileFormatValidator = new FileFormatValidator();
+        repository.MajorRepository majorRepository = new repository.MajorRepository();
+        FileFormatValidator fileFormatValidator = new FileFormatValidator(majorRepository);
         fileFormatValidator.validate();
 
         OrphanDataValidator orphanDataValidator = new OrphanDataValidator();

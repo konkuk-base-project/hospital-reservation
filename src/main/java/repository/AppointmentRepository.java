@@ -43,15 +43,15 @@ public class AppointmentRepository {
 
         } catch (NoSuchFileException e) {
             throw new AppointmentFileException(
-                AppointmentFileException.ErrorType.FILE_NOT_FOUND,
-                "파일: " + filePath.toString(),
-                e
+                    AppointmentFileException.ErrorType.FILE_NOT_FOUND,
+                    "파일: " + filePath.toString(),
+                    e
             );
         } catch (IOException e) {
             throw new AppointmentFileException(
-                AppointmentFileException.ErrorType.FILE_READ_ERROR,
-                "파일: " + filePath.toString(),
-                e
+                    AppointmentFileException.ErrorType.FILE_READ_ERROR,
+                    "파일: " + filePath.toString(),
+                    e
             );
         }
     }
@@ -59,7 +59,7 @@ public class AppointmentRepository {
     /**
      * 특정 의사의 예약 가능한 시간대를 조회합니다
      *
-     * @param date 조회할 날짜
+     * @param date     조회할 날짜
      * @param doctorId 의사 번호
      * @return 예약 가능한 시간 리스트
      * @throws AppointmentFileException 파일 읽기 또는 파싱 중 오류 발생 시
@@ -77,9 +77,8 @@ public class AppointmentRepository {
 
         if (doctorIndex == -1) {
             throw new AppointmentFileException(
-                AppointmentFileException.ErrorType.INVALID_DOCTOR_LIST,
-                "해당 날짜에 의사 번호 " + doctorId + "가 존재하지 않습니다"
-            );
+                    AppointmentFileException.ErrorType.INVALID_DOCTOR_LIST,
+                    "해당 날짜에 의사 번호 " + doctorId + "가 존재하지 않습니다");
         }
 
         List<String> availableSlots = new ArrayList<>();
@@ -97,9 +96,9 @@ public class AppointmentRepository {
     /**
      * 예약을 생성합니다
      *
-     * @param date 예약 날짜
-     * @param doctorId 의사 번호
-     * @param time 예약 시간
+     * @param date          예약 날짜
+     * @param doctorId      의사 번호
+     * @param time          예약 시간
      * @param reservationId 예약 번호
      * @throws AppointmentFileException 파일 처리 중 오류 발생 시
      */
@@ -129,8 +128,7 @@ public class AppointmentRepository {
         if (!"0".equals(currentStatus) && !currentStatus.contains("(3)")) {
             throw new AppointmentFileException(
                     AppointmentFileException.ErrorType.INVALID_APPOINTMENT_STATUS,
-                    String.format("해당 시간대는 예약할 수 없습니다. 현재 상태: %s", currentStatus)
-            );
+                    String.format("해당 시간대는 예약할 수 없습니다. 현재 상태: %s", currentStatus));
         }
 
         // 예약 번호로 업데이트 (상태코드 1: 예약완료)
@@ -151,7 +149,8 @@ public class AppointmentRepository {
 
             for (int i = 1; i < doctorLines.size(); i++) {
                 String line = doctorLines.get(i).trim();
-                if (line.isEmpty()) continue;
+                if (line.isEmpty())
+                    continue;
 
                 String[] parts = line.split("\\s+");
                 if (parts.length >= 1) {
@@ -162,8 +161,7 @@ public class AppointmentRepository {
             if (doctorIds.isEmpty()) {
                 throw new AppointmentFileException(
                         AppointmentFileException.ErrorType.INVALID_DOCTOR_LIST,
-                        "의사 목록을 찾을 수 없습니다"
-                );
+                        "의사 목록을 찾을 수 없습니다");
             }
 
             String[] doctorArray = doctorIds.toArray(new String[0]);
@@ -192,15 +190,14 @@ public class AppointmentRepository {
             throw new AppointmentFileException(
                     AppointmentFileException.ErrorType.FILE_READ_ERROR,
                     "의사 목록 파일을 읽는 중 오류가 발생했습니다",
-                    e
-            );
+                    e);
         }
     }
 
     /**
      * 예약을 취소합니다
      *
-     * @param date 예약 날짜
+     * @param date          예약 날짜
      * @param reservationId 취소할 예약 번호
      * @throws AppointmentFileException 파일 처리 중 오류 발생 시
      */
@@ -217,14 +214,44 @@ public class AppointmentRepository {
                     break;
                 }
             }
-            if (found) break;
+            if (found)
+                break;
         }
 
         if (!found) {
             throw new AppointmentFileException(
-                AppointmentFileException.ErrorType.INVALID_APPOINTMENT_STATUS,
-                "예약 번호 " + reservationId + "를 찾을 수 없습니다"
-            );
+                    AppointmentFileException.ErrorType.INVALID_APPOINTMENT_STATUS,
+                    "예약 번호 " + reservationId + "를 찾을 수 없습니다");
+        }
+
+        saveAppointmentData(date, data);
+    }
+
+    /**
+     * 예약을 삭제합니다 (상태를 0으로 초기화)
+     * 회원 탈퇴 시 사용됩니다.
+     */
+    public void deleteAppointment(LocalDate date, String reservationId) throws AppointmentFileException {
+        AppointmentData data = getAppointmentsByDate(date);
+
+        boolean found = false;
+        for (TimeSlot slot : data.timeSlots) {
+            for (int i = 0; i < slot.statuses.length; i++) {
+                // 예약번호만 비교
+                if (slot.statuses[i].startsWith(reservationId + "(")) {
+                    slot.statuses[i] = "0"; // 상태코드 0: 예약 가능으로 초기화
+                    found = true;
+                    break;
+                }
+            }
+            if (found)
+                break;
+        }
+
+        if (!found) {
+            throw new AppointmentFileException(
+                    AppointmentFileException.ErrorType.INVALID_APPOINTMENT_STATUS,
+                    "예약 번호 " + reservationId + "를 찾을 수 없습니다");
         }
 
         saveAppointmentData(date, data);
@@ -254,10 +281,9 @@ public class AppointmentRepository {
         LocalDate fileDate = LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
         if (!fileDate.equals(expectedDate)) {
             throw new AppointmentFileException(
-                AppointmentFileException.ErrorType.INVALID_DATE_FORMAT,
-                String.format("파일의 날짜(%s)가 요청한 날짜(%s)와 다릅니다", fileDate, expectedDate),
-                1
-            );
+                    AppointmentFileException.ErrorType.INVALID_DATE_FORMAT,
+                    String.format("파일의 날짜(%s)가 요청한 날짜(%s)와 다릅니다", fileDate, expectedDate),
+                    1);
         }
 
         // 2행: 의사 번호 리스트 검증
@@ -288,9 +314,8 @@ public class AppointmentRepository {
 
         if (timeSlots.isEmpty()) {
             throw new AppointmentFileException(
-                AppointmentFileException.ErrorType.MISSING_REQUIRED_LINE,
-                "시간 슬롯 데이터가 하나도 없습니다"
-            );
+                    AppointmentFileException.ErrorType.MISSING_REQUIRED_LINE,
+                    "시간 슬롯 데이터가 하나도 없습니다");
         }
 
         // 시간 슬롯 완전성 검증 (09:00~17:50, 10분 간격, 순서대로)
@@ -331,10 +356,9 @@ public class AppointmentRepository {
 
         } catch (IOException e) {
             throw new AppointmentFileException(
-                AppointmentFileException.ErrorType.FILE_WRITE_ERROR,
-                "파일: " + filePath.toString(),
-                e
-            );
+                    AppointmentFileException.ErrorType.FILE_WRITE_ERROR,
+                    "파일: " + filePath.toString(),
+                    e);
         }
     }
 
@@ -348,9 +372,8 @@ public class AppointmentRepository {
             }
         }
         throw new AppointmentFileException(
-            AppointmentFileException.ErrorType.INVALID_DOCTOR_LIST,
-            "의사 번호 " + doctorId + "를 찾을 수 없습니다"
-        );
+                AppointmentFileException.ErrorType.INVALID_DOCTOR_LIST,
+                "의사 번호 " + doctorId + "를 찾을 수 없습니다");
     }
 
     /**
@@ -363,9 +386,8 @@ public class AppointmentRepository {
             }
         }
         throw new AppointmentFileException(
-            AppointmentFileException.ErrorType.INVALID_TIME_SLOT,
-            "시간 " + time + "을 찾을 수 없습니다"
-        );
+                AppointmentFileException.ErrorType.INVALID_TIME_SLOT,
+                "시간 " + time + "을 찾을 수 없습니다");
     }
 
     /**

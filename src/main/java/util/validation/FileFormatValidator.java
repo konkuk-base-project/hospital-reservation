@@ -25,6 +25,12 @@ public class FileFormatValidator {
     private static final Pattern MAJOR_CODE_PATTERN = Pattern.compile("^[A-Z]{2,6}$");
     private static final Pattern DAY_OF_WEEK_PATTERN = Pattern.compile("^(MON|TUE|WED|THU|FRI|SAT|SUN)$");
 
+    private final repository.MajorRepository majorRepository;
+
+    public FileFormatValidator(repository.MajorRepository majorRepository) {
+        this.majorRepository = majorRepository;
+    }
+
     public void validate() {
         System.out.print("파일 형식을 검증합니다...");
 
@@ -530,20 +536,6 @@ public class FileFormatValidator {
 
     private void validateDoctorMajorCodeConsistency() {
         try {
-            // majorlist.txt에서 진료과 코드 목록 읽기
-            List<String> majorLines = FileUtil.readLines("data/major/majorlist.txt");
-            java.util.Set<String> validMajorCodes = new java.util.HashSet<>();
-
-            for (int i = 1; i < majorLines.size(); i++) {
-                String line = majorLines.get(i).trim();
-                if (line.isEmpty()) continue;
-
-                String[] parts = line.split("\\s+", 2);
-                if (parts.length >= 1) {
-                    validMajorCodes.add(parts[0]);
-                }
-            }
-
             // doctorlist.txt에서 의사들의 진료과 코드 검증
             List<String> doctorLines = FileUtil.readLines("data/doctor/doctorlist.txt");
 
@@ -556,10 +548,9 @@ public class FileFormatValidator {
                     String majorCode = parts[2];
 
                     // 진료과 코드가 majorlist.txt에 존재하는지 확인
-                    if (!validMajorCodes.contains(majorCode)) {
+                    if (!majorRepository.isMajorExists(majorCode)) {
                         throw new FileFormatException(
-                            "[오류] 진료과 코드 불일치: " + majorCode + "은(는) '/data/major/majorlist.txt'에 존재하지 않습니다. 프로그램을 종료합니다."
-                        );
+                                "[오류] 진료과 코드 불일치: " + majorCode + "은(는) '/data/major/majorlist.txt'에 존재하지 않습니다. 프로그램을 종료합니다.");
                     }
                 }
             }
@@ -656,7 +647,7 @@ public class FileFormatValidator {
                 int endMinute = Integer.parseInt(endParts[1]);
 
                 if (startHour < 0 || startHour > 23 || startMinute < 0 || startMinute > 59 ||
-                    endHour < 0 || endHour > 23 || endMinute < 0 || endMinute > 59) {
+                        endHour < 0 || endHour > 23 || endMinute < 0 || endMinute > 59) {
                     throw new FileFormatException("[오류] /" + filePath + "의 스케줄 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                 }
 
@@ -731,7 +722,7 @@ public class FileFormatValidator {
                     if (accountType.equals("PATIENT")) {
                         if (!patientIds.contains(identifier)) {
                             throw new FileFormatException(
-                                "[오류] 계정 타입 불일치: " + username + "은 PATIENT로 등록되어 있으나 환자 목록에 존재하지 않습니다. 프로그램을 종료합니다."
+                                    "[오류] 계정 타입 불일치: " + username + "은 PATIENT로 등록되어 있으나 환자 목록에 존재하지 않습니다. 프로그램을 종료합니다."
                             );
                         }
                     }
@@ -739,7 +730,7 @@ public class FileFormatValidator {
                     else if (accountType.equals("DOCTOR")) {
                         if (!doctorIds.contains(identifier)) {
                             throw new FileFormatException(
-                                "[오류] 계정 타입 불일치: " + username + "은 DOCTOR로 등록되어 있으나 의사 목록에 존재하지 않습니다. 프로그램을 종료합니다."
+                                    "[오류] 계정 타입 불일치: " + username + "은 DOCTOR로 등록되어 있으나 의사 목록에 존재하지 않습니다. 프로그램을 종료합니다."
                             );
                         }
                     }

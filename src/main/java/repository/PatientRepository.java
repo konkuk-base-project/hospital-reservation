@@ -1,6 +1,7 @@
 package repository;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -23,10 +24,17 @@ public class PatientRepository {
             List<String> lines = FileUtil.readLines(PATIENT_LIST_FILE_PATH);
             for (int i = 1; i < lines.size(); i++) {
                 String line = lines.get(i);
-                if (line.trim().isEmpty()) continue;
+                if (line.trim().isEmpty())
+                    continue;
                 String[] parts = line.split("\\s+");
-                if (parts.length == 5) {
+                if (parts.length >= 5) {
                     Patient patient = new Patient(parts[0], parts[1], parts[2], parts[3], parts[4]);
+                    if (parts.length >= 6) {
+                        try {
+                            patient.setNoshowCount(Integer.parseInt(parts[5]));
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
                     patients.add(patient);
                     int currentNum = Integer.parseInt(parts[0].substring(1));
                     if (currentNum > lastPatientNumber) {
@@ -57,5 +65,41 @@ public class PatientRepository {
     public String getNextPatientId() {
         lastPatientNumber++;
         return String.format("P%06d", lastPatientNumber);
+    }
+
+    public void delete(String patientId) throws IOException {
+        patients.removeIf(p -> p.getPatientId().equals(patientId));
+
+        List<String> lines = new ArrayList<>();
+        lines.add(FileUtil.readLines(PATIENT_LIST_FILE_PATH).get(0));
+        for (Patient p : patients) {
+            lines.add(p.toPatientListString());
+        }
+        FileUtil.writeLines(PATIENT_LIST_FILE_PATH, lines);
+
+        Path detailFilePath = Paths.get(PATIENT_DIR_PATH, patientId + ".txt");
+        Files.deleteIfExists(detailFilePath);
+    }
+
+    public List<String> getPatientReservations(String patientId) {
+        List<String> reservations = new ArrayList<>();
+        Path detailFilePath = Paths.get(PATIENT_DIR_PATH, patientId + ".txt");
+
+        if (!Files.exists(detailFilePath)) {
+            return reservations;
+        }
+
+        try {
+            List<String> lines = Files.readAllLines(detailFilePath);
+            for (int i = 3; i < lines.size(); i++) {
+                String line = lines.get(i).trim();
+                if (!line.isEmpty()) {
+                    reservations.add(line);
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("[오류] 환자 상세 정보를 읽는 중 오류가 발생했습니다: " + e.getMessage());
+        }
+        return reservations;
     }
 }

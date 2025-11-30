@@ -11,14 +11,17 @@ import service.AuthContext;
 import util.exception.AppointmentFileException;
 import util.exception.SearchException;
 import util.file.FileUtil;
+import repository.MajorRepository;
 
 public class SearchService {
     private final AuthContext authContext;
     private final AppointmentRepository appointmentRepository;
+    private final MajorRepository majorRepository;
 
-    public SearchService(AuthContext authContext) {
+    public SearchService(AuthContext authContext, MajorRepository majorRepository) {
         this.authContext = authContext;
         this.appointmentRepository = new AppointmentRepository();
+        this.majorRepository = majorRepository;
     }
 
     /**
@@ -63,7 +66,8 @@ public class SearchService {
                     String[] parts = reservation.split("\\s+");
                     // R00000001 | 2025-10-05 | 09:30-09:40 | 내과 | 김의사 | [예약중]
                     String status = getStatusString(parts[6]);
-                    String deptName = getDepartmentName(parts[4]);
+                    String deptName = majorRepository.findByCode(parts[4]).map(model.Major::getMajorName)
+                            .orElse(parts[4]);
                     String doctorName = getDoctorName(parts[5]);
                     System.out.printf("%s | %s | %s-%s | %s | %s | [%s]%n",
                             parts[0], parts[1], parts[2], parts[3], deptName, doctorName, status);
@@ -89,8 +93,8 @@ public class SearchService {
         String deptCode = args[0].toUpperCase();
 
         // 진료과 코드 검증
-        if (!isValidDepartment(deptCode)) {
-            throw new SearchException("존재하지 않는 진료과입니다.\n사용 가능한 진료과: IM(내과), GS(일반외과), OB(산부인과), PED(소아과), PSY(정신과), DERM(피부과), ENT(이비인후과), ORTH(정형외과)");
+        if (!majorRepository.isMajorExists(deptCode)) {
+            throw new SearchException("존재하지 않는 진료과입니다.\n사용 가능한 진료과: " + getAvailableMajorsString());
         }
 
         LocalDate date = null;
@@ -101,6 +105,16 @@ public class SearchService {
 
         // 해당 진료과 의사 찾기 및 예약 가능 시간 조회
         showAvailableSlotsByDepartment(deptCode, date);
+    }
+
+    private String getAvailableMajorsString() {
+        StringBuilder sb = new StringBuilder();
+        majorRepository.findAll().forEach(major -> {
+            if (!sb.isEmpty())
+                sb.append(", ");
+            sb.append(major.getMajorCode()).append("(").append(major.getMajorName()).append(")");
+        });
+        return sb.toString();
     }
 
     /**
@@ -132,11 +146,37 @@ public class SearchService {
      * 진료과별 예약 가능 시간 조회
      */
     private void showAvailableSlotsByDepartment(String deptCode, LocalDate date) throws SearchException {
+        List<DoctorInfo> doctors = findDoctorsByDepartment(deptCode);
+
+        if (doctors.isEmpty()) {
+            System.out.println("(해당 진료과의 의사가 없습니다)");
+            return;
+        }
+
+        System.out.println("======================================================================================");
+        String deptName = majorRepository.findByCode(deptCode).map(model.Major::getMajorName).orElse(deptCode);
+        System.out.printf("%s (%s) 예약 가능 시간%s%n", deptName, deptCode, date != null ? " (" + date + ")" : "");
+        System.out.println("======================================================================================");
+
+        boolean anySlot = false;
+        for (DoctorInfo doc : doctors) {
+            List<String> slots = getAvailableSlots(doc.id, date);
+            if (!slots.isEmpty()) {
+                anySlot = true;
+                System.out.printf("[%s] %s: %s%n", doc.id, doc.name, String.join(", ", slots));
+            }
+        }
+
+        if (!anySlot) {
+            System.out.println("(예약 가능한 시간이 없습니다)");
+        }
+        System.out.println("======================================================================================");
+    }
+
+    private List<DoctorInfo> findDoctorsByDepartment(String deptCode) throws SearchException {
+        List<DoctorInfo> doctors = new ArrayList<>();
         try {
             List<String> lines = FileUtil.readLines("data/doctor/doctorlist.txt");
-            List<DoctorInfo> doctors = new ArrayList<>();
-
-            // 해당 진료과 의사 찾기
             for (int i = 1; i < lines.size(); i++) {
                 String line = lines.get(i).trim();
                 if (line.isEmpty()) continue;
@@ -146,44 +186,10 @@ public class SearchService {
                     doctors.add(new DoctorInfo(parts[0], parts[1], parts[2]));
                 }
             }
-
-            if (doctors.isEmpty()) {
-                throw new SearchException("해당 진료과에 의사가 없습니다.");
-            }
-
-            String deptName = getDepartmentName(deptCode);
-
-            if (date == null) {
-                System.out.println("======================================================================================");
-                System.out.println(deptName + "(" + deptCode + ") 예약 가능 일정");
-                System.out.println("======================================================================================");
-            } else {
-                System.out.println("======================================================================================");
-                System.out.println(deptName + "(" + deptCode + ") 예약 가능 일정 (" + date + ")");
-                System.out.println("======================================================================================");
-            }
-
-            boolean hasAvailable = false;
-
-            for (DoctorInfo doctor : doctors) {
-                List<String> availableSlots = getAvailableSlots(doctor.id, date);
-
-                if (!availableSlots.isEmpty()) {
-                    hasAvailable = true;
-                    System.out.println("의사: " + doctor.name + " (" + doctor.id + ")");
-                    for (String slot : availableSlots) {
-                        System.out.println("- " + slot);
-                    }
-                }
-            }
-
-            if (!hasAvailable) {
-                System.out.println("예약 가능한 시간이 없습니다.");
-            }
-
         } catch (IOException e) {
-            throw new SearchException("진료과 정보를 조회하는 중 오류가 발생했습니다.");
+            throw new SearchException("의사 정보를 조회하는 중 오류가 발생했습니다.");
         }
+        return doctors;
     }
 
     /**
@@ -314,23 +320,6 @@ public class SearchService {
     }
 
     /**
-     * 진료과 이름 반환
-     */
-    private String getDepartmentName(String code) {
-        switch (code) {
-            case "IM": return "내과";
-            case "GS": return "일반외과";
-            case "OB": return "산부인과";
-            case "PED": return "소아과";
-            case "PSY": return "정신과";
-            case "DERM": return "피부과";
-            case "ENT": return "이비인후과";
-            case "ORTH": return "정형외과";
-            default: return code;
-        }
-    }
-
-    /**
      * 의사 이름 가져오기
      */
     private String getDoctorName(String doctorId) throws IOException {
@@ -340,13 +329,6 @@ public class SearchService {
             return parts[1];
         }
         return doctorId;
-    }
-
-    /**
-     * 진료과 코드 유효성 검증
-     */
-    private boolean isValidDepartment(String code) {
-        return code.matches("^(IM|GS|OB|PED|PSY|DERM|ENT|ORTH)$");
     }
 
     /**

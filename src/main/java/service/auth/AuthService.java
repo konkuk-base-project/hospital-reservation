@@ -2,8 +2,10 @@ package service.auth;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -13,6 +15,7 @@ import model.User;
 import repository.AuthRepository;
 import repository.DoctorRepository;
 import repository.PatientRepository;
+import repository.AppointmentRepository;
 import service.AuthContext;
 import util.exception.LoginException;
 import util.exception.SignupException;
@@ -24,13 +27,15 @@ public class AuthService {
     private final PatientRepository patientRepository;
     private final DoctorRepository doctorRepository;
     private final AuthRepository authRepository;
+    private final AppointmentRepository appointmentRepository;
     private final AuthContext authContext;
 
     public AuthService(PatientRepository patientRepository, DoctorRepository doctorRepository,
-                       AuthRepository authRepository, AuthContext authContext) {
+            AuthRepository authRepository, AppointmentRepository appointmentRepository, AuthContext authContext) {
         this.patientRepository = patientRepository;
         this.doctorRepository = doctorRepository;
         this.authRepository = authRepository;
+        this.appointmentRepository = appointmentRepository;
         this.authContext = authContext;
     }
 
@@ -75,7 +80,8 @@ public class AuthService {
      */
     public String signupDoctor(String[] args) throws SignupException {
         if (args.length != 6) {
-            throw new SignupException("인자의 개수가 올바르지 않습니다. (형식: signup-doctor <아이디> <비밀번호> <비밀번호확인> <이름> <진료과코드> <전화번호>)");
+            throw new SignupException(
+                    "인자의 개수가 올바르지 않습니다. (형식: signup-doctor <아이디> <비밀번호> <비밀번호확인> <이름> <진료과코드> <전화번호>)");
         }
 
         String username = args[0];
@@ -103,8 +109,7 @@ public class AuthService {
                     name,
                     deptCode,
                     phoneNumber,
-                    registrationDate
-            );
+                    registrationDate);
 
             doctorRepository.save(newDoctor);
 
@@ -169,6 +174,85 @@ public class AuthService {
         authContext.logout();
     }
 
+    /**
+     * 6.1.5 회원 탈퇴
+     */
+    public List<String> getFutureReservations(String password) throws LoginException {
+        if (!authContext.isLoggedIn()) {
+            throw new LoginException("로그인이 필요한 서비스입니다.");
+        }
+        User user = authContext.getCurrentUser();
+
+        if (!user.getRole().equals("PATIENT")) {
+            throw new LoginException("환자만 탈퇴할 수 있습니다.");
+        }
+
+        String hashedInputPassword = PasswordHasher.hash(password);
+        if (!user.getHashedPassword().equals(hashedInputPassword)) {
+            throw new LoginException("비밀번호가 일치하지 않습니다.");
+        }
+
+        List<String> allReservations = patientRepository.getPatientReservations(user.getId());
+        List<String> futureReservations = new ArrayList<>();
+
+        LocalDate today = VirtualTime.currentDate();
+        LocalTime now = VirtualTime.currentDateTime().toLocalTime();
+
+        for (String res : allReservations) {
+            String[] parts = res.split("\\s+");
+            if (parts.length < 7)
+                continue;
+
+            // 예약 상태가 취소(3)인 경우 제외
+            if (parts[6].contains("(3)"))
+                continue;
+
+            LocalDate resDate = LocalDate.parse(parts[1]);
+            LocalTime resTime = LocalTime.parse(parts[2]);
+
+            if (resDate.isAfter(today) || (resDate.equals(today) && resTime.isAfter(now))) {
+                futureReservations.add(res);
+            }
+        }
+
+        return futureReservations;
+    }
+
+    public void withdraw(String password) throws LoginException, IOException {
+        // 1. 검증 및 미래 예약 확인
+        List<String> futureReservations = getFutureReservations(password);
+        User user = authContext.getCurrentUser();
+
+        // 2. 미래 예약 취소
+        try {
+            for (String res : futureReservations) {
+                String[] parts = res.split("\\s+");
+                String resId = parts[0];
+                LocalDate resDate = LocalDate.parse(parts[1]);
+
+                String resTime = parts[2];
+                String doctorId = parts[5];
+
+                // AppointmentRepository를 통해 예약 삭제 (상태 0으로 초기화)
+                appointmentRepository.deleteAppointment(resDate, resId);
+
+                // DoctorRepository를 통해 의사 스케줄 업데이트 (상태 0으로 초기화)
+                doctorRepository.updateSchedule(doctorId, resDate, resTime, "0");
+            }
+        } catch (Exception e) {
+            System.out.println("[경고] 예약 취소 중 오류 발생: " + e.getMessage());
+        }
+
+        // 3. 환자 정보 삭제
+        patientRepository.delete(user.getId());
+
+        // 4. 인증 정보 삭제
+        authRepository.delete(user.getUsername());
+
+        // 5. 로그아웃
+        authContext.logout();
+    }
+
     // ========== 검증 메서드들 ==========
 
     private void validateUsername(String username) throws SignupException {
@@ -225,7 +309,8 @@ public class AuthService {
             boolean found = false;
             for (int i = 1; i < lines.size(); i++) {
                 String line = lines.get(i).trim();
-                if (line.isEmpty()) continue;
+                if (line.isEmpty())
+                    continue;
                 String[] parts = line.split("\\s+");
                 if (parts.length >= 1 && parts[0].equals(deptCode)) {
                     found = true;
