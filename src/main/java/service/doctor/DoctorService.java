@@ -78,7 +78,6 @@ public class DoctorService {
 
             List<String> lines = FileUtil.readLines(masterFilePath);
             boolean updated = false;
-            boolean alreadyExists = false;
 
             // 요일 인덱스 찾기
             int dayIndex = getDayIndex(dayCode);
@@ -89,10 +88,10 @@ public class DoctorService {
 
                 // 이미 일정이 있는지 확인
                 if (parts.length == 3 && !parts[1].equals("0")) {
-                    alreadyExists = true;
+                    throw new DoctorScheduleException("이미 진료 일정이 존재합니다.");
                 }
 
-                // 일정 업데이트
+                // 일정 설정
                 lines.set(dayIndex, dayCode + " " + startTime + " " + endTime);
                 updated = true;
             }
@@ -116,14 +115,10 @@ public class DoctorService {
                     }
                 }
 
-                if (alreadyExists) {
-                    System.out.println("[경고] 진료 일정이 이미 존재합니다.");
-                }
-
                 System.out.println("진료 일정이 설정되었습니다.");
                 System.out.println("- 요일: " + DAY_MAP_ENG_TO_KOR.get(dayCode) + " (" + dayCode + ")");
                 System.out.println("- 시간: " + startTime + " ~ " + endTime);
-                System.out.println("이 일정은 매주 적용됩니다.");
+                System.out.println("이 일정은 매주 " + DAY_MAP_ENG_TO_KOR.get(dayCode) + "에 적용됩니다.");
             }
 
         } catch (IOException e) {
@@ -257,10 +252,9 @@ public class DoctorService {
             Path masterFile = FileUtil.getResourcePath(masterFilePath);
             Files.write(masterFile, lines);
 
-            System.out.println(DAY_MAP_ENG_TO_KOR.get(dayCode) + "의 진료 일정이 수정되었습니다.");
+            System.out.println("진료 일정이 수정되었습니다.");
             System.out.println("- 기존: " + oldStart + " ~ " + oldEnd);
             System.out.println("- 변경: " + startTime + " ~ " + endTime);
-            System.out.println("\n[안내] 과거 예약은 그대로 유지됩니다.");
 
         } catch (IOException e) {
             throw new DoctorScheduleException("진료 일정 수정 중 오류가 발생했습니다: " + e.getMessage());
@@ -341,7 +335,6 @@ public class DoctorService {
             Files.write(masterFile, lines);
 
             System.out.println(DAY_MAP_ENG_TO_KOR.get(dayCode) + "의 진료 일정이 삭제되었습니다.");
-            System.out.println("[안내] 과거 예약은 그대로 유지됩니다.");
 
         } catch (IOException e) {
             throw new DoctorScheduleException("진료 일정 삭제 중 오류가 발생했습니다: " + e.getMessage());
