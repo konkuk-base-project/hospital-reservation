@@ -1,6 +1,8 @@
 package service.auth;
 
 import java.io.IOException;
+import java.nio.file.Files; // 추가
+import java.nio.file.Path; // 추가
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -8,6 +10,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Stream; // 추가
 
 import model.Doctor;
 import model.Patient;
@@ -117,9 +120,50 @@ public class AuthService {
             User newUser = new User(username, hashedPassword, "DOCTOR", newDoctorId);
             authRepository.save(newUser);
 
+            // 모든 기존 예약 파일에 새 의사 열 추가
+            updateAllAppointmentFilesWithNewDoctor(newDoctorId);
+
             return "의사 회원가입이 완료되었습니다. [의사번호: " + newDoctorId + "]";
         } catch (IOException e) {
             throw new SignupException("회원 정보를 파일에 저장하는 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+    private void updateAllAppointmentFilesWithNewDoctor(String newDoctorId) throws IOException {
+        Path appointmentDir = FileUtil.getResourcePath("data/appointment");
+
+        if (!Files.exists(appointmentDir)) {
+            return; // 예약 파일 없으면 스킵
+        }
+
+        try (Stream<Path> files = Files.list(appointmentDir)) {
+            files.filter(path -> path.toString().endsWith(".txt"))
+                    .filter(path -> path.getFileName().toString().matches("\\d{8}\\.txt"))
+                    .forEach(path -> {
+                        try {
+                            List<String> lines = Files.readAllLines(path);
+                            List<String> updatedLines = new ArrayList<>();
+
+                            for (int i = 0; i < lines.size(); i++) {
+                                String line = lines.get(i);
+
+                                if (i == 0) {
+                                    // 1행: 날짜 - 그대로
+                                    updatedLines.add(line);
+                                } else if (i == 1) {
+                                    // 2행: 헤더 - 새 의사 추가
+                                    updatedLines.add(line + " " + newDoctorId);
+                                } else {
+                                    // 3행~: 시간 슬롯 - 0 추가
+                                    updatedLines.add(line + " 0");
+                                }
+                            }
+
+                            Files.write(path, updatedLines);
+                        } catch (IOException e) {
+                            throw new RuntimeException("예약 파일 업데이트 실패: " + path, e);
+                        }
+                    });
         }
     }
 
