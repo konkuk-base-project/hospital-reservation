@@ -33,6 +33,6 @@ public class Patient {
     }
 
     public String toDetailFileHeaderString() {
-        return String.join(" ", patientId, name, birthDate, phoneNumber);
+        return String.join(" ", patientId, name, birthDate, phoneNumber, String.valueOf(noshowCount));
     }
 }
