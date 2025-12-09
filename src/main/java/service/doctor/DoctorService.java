@@ -89,7 +89,7 @@ public class DoctorService {
 
                 // 이미 일정이 있는지 확인
                 if (parts.length == 3 && !parts[1].equals("0")) {
-                    throw new DoctorScheduleException("이미 진료 일정이 존재합니다.");
+                    throw new DoctorScheduleException("진료 일정이 이미 존재합니다.");
                 }
 
                 // 일정 설정
