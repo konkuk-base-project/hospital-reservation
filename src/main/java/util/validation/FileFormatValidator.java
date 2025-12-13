@@ -484,13 +484,13 @@ public class FileFormatValidator {
 
                                 } catch (AppointmentFileException e) {
                                     String filePath = "data/appointment/" + fileName;
-                                    String errorMsg = String.format("[오류] '/%s'의 형식이 올바르지 않습니다. %s 프로그램을 종료합니다.",
-                                            filePath, e.getMessage());
+                                    String errorMsg = String.format("[오류] 예약 파일 형식 오류: /%s 프로그램을 종료합니다.",
+                                            filePath);
                                     throw new FileFormatException(errorMsg);
                                 } catch (Exception e) {
                                     String filePath = "data/appointment/" + fileName;
                                     throw new FileFormatException(
-                                            "[오류] '/" + filePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
+                                            "[오류] 예약 파일 형식 오류: /" + filePath + " 프로그램을 종료합니다.");
                                 }
                             }
                         });
