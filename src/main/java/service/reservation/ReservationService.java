@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 
 import model.User;
 import repository.AppointmentRepository;
+import repository.MajorRepository;
 import repository.ReservationRepository;
 import service.AuthContext;
 import util.exception.ReservationException;
@@ -23,6 +24,7 @@ public class ReservationService {
     private final AuthContext authContext;
     private final AppointmentRepository appointmentRepository;
     private final ReservationRepository reservationRepository;
+    private final MajorRepository majorRepository;
 
     private static final Pattern RESERVATION_ID_PATTERN = Pattern.compile("^R\\d{8}$");
     private static final Pattern DOCTOR_ID_PATTERN = Pattern.compile("^D\\d{5}$");
@@ -33,6 +35,7 @@ public class ReservationService {
         this.authContext = authContext;
         this.appointmentRepository = new AppointmentRepository();
         this.reservationRepository = new ReservationRepository();
+        this.majorRepository = new MajorRepository();
     }
 
     /**
@@ -387,7 +390,7 @@ public class ReservationService {
         LocalDateTime reservationTime = LocalDateTime.of(date, time);
 
         if (reservationTime.isBefore(now)) {
-            throw new ReservationException("현재 가상 시간 이전의 시간으로는 예약할 수 없습니다.");
+            throw new ReservationException("과거 날짜로는 예약할 수 없습니다 ");
         }
         // 노쇼 횟수 확인 (3회 이상이면 예약 불가)
         User currentUser = authContext.getCurrentUser();
@@ -399,6 +402,10 @@ public class ReservationService {
         }
 
         // 진료과 소속 의사 목록에서 예약 가능한 의사 찾기
+        if (!majorRepository.isMajorExists(deptCode)) {
+            throw new ReservationException("존재하지 않는 진료과입니다.\n사용 가능한 진료과: " + getAvailableMajorsString());
+        }
+
         String selectedDoctorId = null;
         try {
             List<String> doctorLines = FileUtil.readLines("data/doctor/doctorlist.txt");
@@ -461,6 +468,16 @@ public class ReservationService {
 
     // ========== 헬퍼 메서드 ==========
 
+    private String getAvailableMajorsString() {
+        StringBuilder sb = new StringBuilder();
+        majorRepository.findAll().forEach(major -> {
+            if (!sb.isEmpty())
+                sb.append(", ");
+            sb.append(major.getMajorCode()).append("(").append(major.getMajorName()).append(")");
+        });
+        return sb.toString();
+    }
+
     private String resolveDoctorId(String doctorIdOrName) throws ReservationException {
         if (DOCTOR_ID_PATTERN.matcher(doctorIdOrName).matches()) {
             if (!FileUtil.resourceExists("data/doctor/" + doctorIdOrName + ".txt")) {
@@ -506,7 +523,7 @@ public class ReservationService {
 
         // 과거 불가
         if (reservationStart.isBefore(now)) {
-            throw new ReservationException("가상 현재 시간 이후만 예약 가능합니다.");
+            throw new ReservationException("과거 날짜로는 예약할 수 없습니다 ");
         }
 
         return date;

@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalTime;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -78,7 +79,6 @@ public class DoctorService {
 
             List<String> lines = FileUtil.readLines(masterFilePath);
             boolean updated = false;
-            boolean alreadyExists = false;
 
             // 요일 인덱스 찾기
             int dayIndex = getDayIndex(dayCode);
@@ -89,10 +89,11 @@ public class DoctorService {
 
                 // 이미 일정이 있는지 확인
                 if (parts.length == 3 && !parts[1].equals("0")) {
-                    alreadyExists = true;
+                    System.out.println("[경고] 진료 일정이 이미 존재합니다.");
+                    return;
                 }
 
-                // 일정 업데이트
+                // 일정 설정
                 lines.set(dayIndex, dayCode + " " + startTime + " " + endTime);
                 updated = true;
             }
@@ -116,14 +117,10 @@ public class DoctorService {
                     }
                 }
 
-                if (alreadyExists) {
-                    System.out.println("[경고] 진료 일정이 이미 존재합니다.");
-                }
-
                 System.out.println("진료 일정이 설정되었습니다.");
                 System.out.println("- 요일: " + DAY_MAP_ENG_TO_KOR.get(dayCode) + " (" + dayCode + ")");
                 System.out.println("- 시간: " + startTime + " ~ " + endTime);
-                System.out.println("이 일정은 매주 적용됩니다.");
+                System.out.println("이 일정은 매주 " + DAY_MAP_ENG_TO_KOR.get(dayCode) + "에 적용됩니다.");
             }
 
         } catch (IOException e) {
@@ -257,10 +254,9 @@ public class DoctorService {
             Path masterFile = FileUtil.getResourcePath(masterFilePath);
             Files.write(masterFile, lines);
 
-            System.out.println(DAY_MAP_ENG_TO_KOR.get(dayCode) + "의 진료 일정이 수정되었습니다.");
+            System.out.println("진료 일정이 수정되었습니다.");
             System.out.println("- 기존: " + oldStart + " ~ " + oldEnd);
             System.out.println("- 변경: " + startTime + " ~ " + endTime);
-            System.out.println("\n[안내] 과거 예약은 그대로 유지됩니다.");
 
         } catch (IOException e) {
             throw new DoctorScheduleException("진료 일정 수정 중 오류가 발생했습니다: " + e.getMessage());
@@ -341,7 +337,6 @@ public class DoctorService {
             Files.write(masterFile, lines);
 
             System.out.println(DAY_MAP_ENG_TO_KOR.get(dayCode) + "의 진료 일정이 삭제되었습니다.");
-            System.out.println("[안내] 과거 예약은 그대로 유지됩니다.");
 
         } catch (IOException e) {
             throw new DoctorScheduleException("진료 일정 삭제 중 오류가 발생했습니다: " + e.getMessage());
@@ -438,14 +433,18 @@ public class DoctorService {
                 throw new DoctorScheduleException("이미 처리된 예약입니다. (현재 상태: " + statusText + ")");
             }
 
-            // 예약 시간 경과 확인
-            LocalDate currentDate = util.file.VirtualTime.currentDate();
+            // 예약 시간 경과 확인 - 수정된 부분
+            LocalDateTime now = util.file.VirtualTime.currentDateTime();
             LocalDate resDate = LocalDate.parse(resInfo.date, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            LocalTime resTime = LocalTime.parse(resInfo.startTime, DateTimeFormatter.ofPattern("HH:mm"));
+            LocalDateTime reservationDateTime = LocalDateTime.of(resDate, resTime);
 
-            if (resDate.isAfter(currentDate)) {
+            // 예약 시간이 아직 경과하지 않은 경우
+            if (reservationDateTime.isAfter(now)) {
                 throw new DoctorScheduleException(String.format(
                         "예약 시간이 아직 경과하지 않았습니다. (예약 시간: %s %s, 현재: %s)",
-                        resInfo.date, resInfo.startTime, currentDate
+                        resInfo.date, resInfo.startTime,
+                        now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
                 ));
             }
 
@@ -510,14 +509,18 @@ public class DoctorService {
                 throw new DoctorScheduleException("이미 처리된 예약입니다. (현재 상태: " + statusText + ")");
             }
 
-            // 예약 시간 경과 확인
-            LocalDate currentDate = util.file.VirtualTime.currentDate();
+            // 예약 시간 경과 확인 - 수정된 부분
+            LocalDateTime now = util.file.VirtualTime.currentDateTime();
             LocalDate resDate = LocalDate.parse(resInfo.date, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            LocalTime resTime = LocalTime.parse(resInfo.startTime, DateTimeFormatter.ofPattern("HH:mm"));
+            LocalDateTime reservationDateTime = LocalDateTime.of(resDate, resTime);
 
-            if (resDate.isAfter(currentDate)) {
+            // 예약 시간이 아직 경과하지 않은 경우
+            if (reservationDateTime.isAfter(now)) {
                 throw new DoctorScheduleException(String.format(
                         "예약 시간이 아직 경과하지 않았습니다. (예약 시간: %s %s, 현재: %s)",
-                        resInfo.date, resInfo.startTime, currentDate
+                        resInfo.date, resInfo.startTime,
+                        now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
                 ));
             }
 
@@ -569,32 +572,34 @@ public class DoctorService {
             List<PatientFileReader.ReservationData> pendingReservations =
                     PatientFileReader.findPendingReservationsByDoctor(doctorId, currentDate);
 
-            // 출력
+            // 데이터가 없는 경우 한 줄만 출력
+            if (pendingReservations.isEmpty()) {
+                System.out.println("처리 대기 중인 예약이 없습니다.");
+                return;
+            }
+
+            // 데이터가 있는 경우 기존 형식으로 출력
             System.out.println("======================================================================================");
             System.out.println("처리 대기 중인 예약 (총 " + pendingReservations.size() + "건)");
             System.out.println("======================================================================================");
 
-            if (pendingReservations.isEmpty()) {
-                System.out.println("처리 대기 중인 예약이 없습니다.");
-            } else {
-                // 날짜 순으로 정렬
-                pendingReservations.sort((a, b) -> {
-                    int dateCompare = a.date.compareTo(b.date);
-                    if (dateCompare != 0) return dateCompare;
-                    return a.startTime.compareTo(b.startTime);
-                });
+            // 날짜 순으로 정렬
+            pendingReservations.sort((a, b) -> {
+                int dateCompare = a.date.compareTo(b.date);
+                if (dateCompare != 0) return dateCompare;
+                return a.startTime.compareTo(b.startTime);
+            });
 
-                for (PatientFileReader.ReservationData info : pendingReservations) {
-                    System.out.printf("%s | %s %s-%s | %s | %s (%s)%n",
-                            info.reservationId,
-                            info.date,
-                            info.startTime,
-                            info.endTime,
-                            getDeptName(info.deptCode),
-                            info.patientName,
-                            info.patientId
-                    );
-                }
+            for (PatientFileReader.ReservationData info : pendingReservations) {
+                System.out.printf("%s | %s %s-%s | %s | %s (%s)%n",
+                        info.reservationId,
+                        info.date,
+                        info.startTime,
+                        info.endTime,
+                        getDeptName(info.deptCode),
+                        info.patientName,
+                        info.patientId
+                );
             }
             System.out.println("======================================================================================");
 
