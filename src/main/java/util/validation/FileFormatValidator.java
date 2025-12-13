@@ -578,7 +578,8 @@ public class FileFormatValidator {
 
                     // Check if master file exists
                     if (!FileUtil.resourceExists(masterFilePath)) {
-                        continue; // Master file is optional
+                        throw new FileFormatException(
+                                "[오류] '/" + masterFilePath + "'의 형식이 올바르지 않습니다. 프로그램을 종료합니다.");
                     }
 
                     // Validate master file format
